@@ -1062,7 +1062,7 @@ const toQ=q=>({q:q.q,ctx:q.ctx,why:q.why,opts:shuffle(q.o.map((t,k)=>({t:t,ok:k=
    ESTADO E ARMAZENAMENTO
    ===================================================================== */
 const KEY='missao-estrelas-v1';
-const DEFAULT={name:'',sound:true,voice:'',pin:'1234',planetsSeen:{},progress:{},opened:{},prizes:[],sim:{best:null,last:null,tries:0,n:20},hist:{}};
+const DEFAULT={name:'',sound:true,voice:'',pin:'1234',planetsSeen:{},progress:{},opened:{},prizes:[],sim:{best:null,last:null,tries:0,n:20,keyed:false},hist:{}};
 const BLANK_PRIZE=()=>({emoji:'🎁',title:'',message:'',img:''});
 function migrate(s){
   if(!Array.isArray(s.prizes)) s.prizes=[];
@@ -1075,6 +1075,7 @@ function migrate(s){
   delete s.claimed;
   if(!s.hist||typeof s.hist!=='object'||Array.isArray(s.hist)) s.hist={};
   if(!s.sim||typeof s.sim!=='object') s.sim={best:null,last:null,tries:0,n:20};
+  if(typeof s.sim.keyed!=='boolean') s.sim.keyed=(s.sim.best||0)>=16;
   return s;
 }
 let memStore=null;
@@ -1317,7 +1318,8 @@ function renderWelcome(){
    ===================================================================== */
 function starsRow(n){ let h=''; for(let i=1;i<=3;i++) h+=`<span class="${i<=n?'on':'off'}">⭐</span>`; return h; }
 const need = k => (k+1)*TOTAL;
-const hasKey = () => !!(S.sim && S.sim.tries>0);
+const SIM_MIN=16;   /* acertos (de 20) para ganhar a chave: 80% */
+const hasKey = () => !!(S.sim && S.sim.keyed);
 function chestState(k){ if(totalStars()<need(k)) return 'locked'; if(S.opened[k]) return 'opened'; if(k===2&&!hasKey()) return 'nokey'; return 'ready'; }
 function nextChestInfo(ts){ for(let k=0;k<3;k++) if(ts<need(k)) return {k:k,left:need(k)-ts}; return null; }
 function renderMap(scroll){
@@ -1330,9 +1332,9 @@ function renderMap(scroll){
     <button class="icon-btn" id="b-adm" aria-label="Área do responsável">⚙️</button></div></div>
     <div class="mission"><div class="mtxt"><b>Rumo aos 3 baús</b><span>${doneCount()} de ${TOTAL} missões</span></div>
       <div class="starbar"><div class="track"><i style="width:${(ts/MAXSTARS*100).toFixed(1)}%"></i></div>${TIERS.map((t,k)=>`<button class="mchest ${chestState(k)}" style="left:${((k+1)/3*100).toFixed(2)}%" data-k="${k}" aria-label="${t.name}">${chestSVG(chestState(k)==='opened'?'open':'',k)}</button>`).join('')}</div>
-      <div class="mnext">${nx?`Próximo: ${TIERS[nx.k].name} · faltam ${nx.left} ⭐`:(hasKey()||S.opened[2]?'Você destravou todos os baús!':'Falta a chave do Baú de Ouro: faça o simulado 📝')}</div></div>`;
+      <div class="mnext">${nx?`Próximo: ${TIERS[nx.k].name} · faltam ${nx.left} ⭐`:(hasKey()||S.opened[2]?'Você destravou todos os baús!':'Falta a chave do Baú de Ouro: acerte 16 de 20 no simulado 📝')}</div></div>`;
   const sm=S.sim||{};
-  h+=`<button class="simcard" id="b-sim"><span class="se">📝</span><span class="st"><b>Simulado da prova</b><small>${sm.tries?`Melhor: ${sm.best} de ${sm.n||20} · feito ${sm.tries} ${sm.tries>1?'vezes':'vez'}`:'20 questões, como na prova. Completar vale a chave do Baú de Ouro 🔑'}</small></span><span class="sg">➜</span></button>`;
+  h+=`<button class="simcard" id="b-sim"><span class="se">📝</span><span class="st"><b>Simulado da prova</b><small>${sm.tries?`Melhor: ${sm.best} de ${sm.n||20} · ${sm.keyed?'· chave ✓':'· faltam acertos para a chave (16)'}`:'20 questões. Acerte 16 para ganhar a chave do Baú de Ouro 🔑'}</small></span><span class="sg">➜</span></button>`;
   const offs=[0,56,84,56,0,-56,-84,-56];
   PLANETS.forEach((p,pi)=>{
     const ls=LESSONS.filter(l=>l.planet===pi), pd=ls.filter(l=>doneOf(l.id)).length;
@@ -1350,7 +1352,7 @@ function renderMap(scroll){
   });
   h+=`<div class="planet" id="chests-sec" style="--pc:#ffd23f"><div class="pemoji">🎁</div><div><b>Baús do Tesouro</b><span>Cada baú guarda uma surpresa</span></div></div>
     <div class="chests3">${TIERS.map((t,k)=>{ const st=chestState(k); const lab= st==='locked'?`Faltam ${need(k)-ts} ⭐`:(st==='ready'?'Toque para abrir!':(st==='nokey'?'Falta a chave 🔑':'Ver prêmio ✓')); return `<button class="cbox ${st}" data-k="${k}">${chestSVG(st==='opened'?'open':'',k)}<b>${t.short}</b><span>${lab}</span></button>`; }).join('')}</div>
-    <p class="chints">Para destravar os baús, ganhe estrelas nas missões. Dá para repetir missões e conquistar as 3 estrelas! O Baú de Ouro também pede a chave 🔑, que vem ao completar o simulado.</p>`;
+    <p class="chints">Para destravar os baús, ganhe estrelas nas missões. Dá para repetir missões e conquistar as 3 estrelas! O Baú de Ouro também pede a chave 🔑, que vem ao acertar pelo menos 16 de 20 (80%) no simulado.</p>`;
   root.innerHTML=h;
   $('#b-snd').onclick=()=>{ S.sound=!S.sound; save(); Snd.init(); Snd.play('click'); renderMap(false); };
   $('#b-adm').onclick=()=>{ Snd.init(); askPin(); };
@@ -1434,7 +1436,7 @@ function finishLesson(){
   const nx=nextChestInfo(after);
   const root=$('#s-result');
   const msg = stars===3?'Missão perfeita! Três estrelas!':stars===2?'Muito bom! Falta pouco para as três estrelas.':'Missão cumprida! Tente de novo para ganhar mais estrelas.';
-  const chestLine = newly.length ? `<div class="rchest up">🎉 Você destravou o ${TIERS[newly[0]].name}!</div>` : goldWait ? `<div class="rchest up">⭐ Estrelas do Baú de Ouro completas! Falta a chave: faça o simulado 📝</div>` : (nx?`<div class="rchest">Próximo: ${TIERS[nx.k].name} · faltam ${nx.left} ⭐ (você tem ${after})</div>`:(hasKey()||S.opened[2]?`<div class="rchest up">Todos os baús destravados!</div>`:`<div class="rchest up">Falta a chave do Baú de Ouro: faça o simulado 📝</div>`));
+  const chestLine = newly.length ? `<div class="rchest up">🎉 Você destravou o ${TIERS[newly[0]].name}!</div>` : goldWait ? `<div class="rchest up">⭐ Estrelas do Baú de Ouro completas! Falta a chave: acerte 16 de 20 no simulado 📝</div>` : (nx?`<div class="rchest">Próximo: ${TIERS[nx.k].name} · faltam ${nx.left} ⭐ (você tem ${after})</div>`:(hasKey()||S.opened[2]?`<div class="rchest up">Todos os baús destravados!</div>`:`<div class="rchest up">Falta a chave do Baú de Ouro: acerte 16 de 20 no simulado 📝</div>`));
   root.innerHTML=`<div class="res"><div class="rt">Missão cumprida!</div><div class="rs">${esc(lesson.title)}</div>
     <div class="rstars"><span>⭐</span><span>⭐</span><span>⭐</span></div>
     <div class="rm">${msg}</div><div class="rc">Você acertou ${firstOK} de ${qn} de primeira.</div>${chestLine}
@@ -1511,11 +1513,11 @@ function answerSim(btn,k){
 }
 function finishSim(){
   const n=SIM.qs.length, sc=SIM.res.filter(r=>r.ok).length, wrong=SIM.res.filter(r=>!r.ok);
-  const hadKey=hasKey();
-  S.sim={best:Math.max((S.sim&&S.sim.best)||0,sc),last:sc,tries:((S.sim&&S.sim.tries)||0)+1,n:n}; save();
+  const hadKey=hasKey(), need80=Math.ceil(n*0.8), newKey=!hadKey&&sc>=need80;
+  S.sim={best:Math.max((S.sim&&S.sim.best)||0,sc),last:sc,tries:((S.sim&&S.sim.tries)||0)+1,n:n,keyed:hadKey||newKey}; save();
   const msg=sc>=n*0.9?'Incrível! Você está pronto para a prova!':sc>=n*0.7?'Muito bom! Veja os erros abaixo e vai ficar ainda melhor.':sc>=n*0.5?'Bom começo! Leia os erros abaixo e faça outro simulado.':'Vamos treinar mais! Releia as missões e tente de novo.';
-  const goldReady=totalStars()>=need(2)&&!S.opened[2];
-  const keyLine=hadKey?'':(goldReady?'<div class="rchest up">🔑 Você ganhou a chave do Baú de Ouro!</div>':'<div class="rchest up">🔑 Você ganhou a chave do Baú de Ouro! Ela fica guardada até você juntar as estrelas.</div>');
+  const goldReady=totalStars()>=need(2)&&!S.opened[2]&&hasKey();
+  const keyLine=hadKey?'':(!newKey?`<div class="rchest">🔑 Para ganhar a chave do Baú de Ouro, acerte pelo menos ${need80} de ${n} (80%). Você fez ${sc}. Tente outro simulado!</div>`:goldReady?'<div class="rchest up">🔑 Você ganhou a chave do Baú de Ouro!</div>':'<div class="rchest up">🔑 Você ganhou a chave do Baú de Ouro! Ela fica guardada até você juntar as estrelas.</div>');
   const root=$('#s-result');
   root.innerHTML=`<div class="res"><div class="rt">Simulado concluído!</div><div class="rs">Treino para a prova</div>
     <div class="simscore"><b>${sc}</b><span>de ${n}</span></div>
@@ -1530,7 +1532,7 @@ function finishSim(){
   $('#r-go').onclick=()=>{ Snd.play('next'); renderMap(false); show('s-map'); };
   $('#r-again').onclick=()=>{ Snd.play('next'); startSimulado(); };
   const rg=$('#r-gold'); if(rg) rg.onclick=()=>{ Snd.play('next'); chestQueue=[]; openChestScreen(2,{unlockAnim:true}); };
-  if(!hadKey) setTimeout(()=>{ Snd.play('unlock'); },700);
+  if(newKey) setTimeout(()=>{ Snd.play('unlock'); },700);
 }
 
 function showMedal(planet,cb){
@@ -1555,8 +1557,8 @@ function openChestScreen(k,opts){
   const already=st==='opened', anim=!!opts.unlockAnim && st==='ready';
   const lockedLook=st==='locked'||st==='nokey'||anim;
   let title,msg;
-  if(st==='locked'){ title=t.name+' trancado'; msg=`Você tem ${ts} de ${nd} estrelas. Faltam ${nd-ts} ⭐ para destravar (média de ${k+1} por missão). Repita missões para ganhar mais estrelas.${k===2?' Depois, complete o simulado para ganhar a chave.':''}`; }
-  else if(st==='nokey'){ title=t.name+' trancado'; msg='Você já juntou todas as estrelas! Agora falta a chave: complete o simulado para abrir este baú.'; }
+  if(st==='locked'){ title=t.name+' trancado'; msg=`Você tem ${ts} de ${nd} estrelas. Faltam ${nd-ts} ⭐ para destravar (média de ${k+1} por missão). Repita missões para ganhar mais estrelas.${k===2?' Depois, acerte pelo menos 16 de 20 no simulado para ganhar a chave.':''}`; }
+  else if(st==='nokey'){ title=t.name+' trancado'; msg='Você já juntou todas as estrelas! Agora falta a chave: acerte pelo menos 16 de 20 no simulado para abrir este baú.'; }
   else if(anim){ title=t.name; msg='Você chegou à média de '+(k+1)+(k===0?' estrela':' estrelas')+' por missão...'; }
   else if(already){ title='Seu prêmio'; msg='Toque no baú para ver a festa de novo.'; }
   else { title='Baú destravado!'; msg='Toque no baú para abrir.'; }
@@ -1660,7 +1662,7 @@ function openAdmin(){
   const m=openModal(`<div class="admin"><h3>Área do responsável</h3>
     ${S.pin==='1234'?'<div class="warn">O PIN ainda é o padrão (1234). Troque por outro na seção Segurança, no fim desta página.</div>':''}
     <div class="sec"><h4>🎁 Prêmios dos 3 baús</h4>
-      <p class="hint">A criança só vê o que há dentro de cada baú quando ele é destravado.<br>🥉 Bronze: média de 1 estrela por missão (${need(0)} ⭐)<br>🥈 Prata: média de 2 estrelas (${need(1)} ⭐)<br>🥇 Ouro: 3 estrelas em todas as missões (${need(2)} ⭐) e completar o simulado (a chave)</p>
+      <p class="hint">A criança só vê o que há dentro de cada baú quando ele é destravado.<br>🥉 Bronze: média de 1 estrela por missão (${need(0)} ⭐)<br>🥈 Prata: média de 2 estrelas (${need(1)} ⭐)<br>🥇 Ouro: 3 estrelas em todas as missões (${need(2)} ⭐) e acertar 80% do simulado, 16 de 20 (a chave)</p>
       <div class="tabs" id="a-tabs">${TIERS.map((t,k)=>`<button type="button" data-t="${k}" class="${k===0?'sel':''}">${t.medal} ${t.short}</button>`).join('')}</div>
       <div id="a-prize"></div>
       <div class="btns"><button class="btn green sm" id="a-save">Salvar prêmios</button><button class="btn sm ghost" id="a-test" style="color:#2a2f8f;background:#eef0ff;box-shadow:none">Ver este baú como a criança verá</button></div>
@@ -1698,7 +1700,7 @@ function openAdmin(){
   $('#a-test',m).onclick=()=>{ savePrizes(); const p=S.prizes[cur]; if(!p.title&&!p.img){ alert('Escreva o que está dentro deste baú para testar.'); return; } closeModal(); openChestScreen(cur,{preview:true}); };
   $('#a-sname',m).onclick=function(){ S.name=$('#a-name',m).value.trim()||'Astronauta'; save(); flash(this,'Salvo! ✓'); };
   const hc=$('#a-hclear',m); if(hc) hc.onclick=()=>confirmBox('Limpar o histórico de erros?','As questões erradas anotadas serão apagadas. Estrelas e missões não mudam.','Limpar',()=>{ S.hist={}; save(); closeModal(); openAdmin(); },true);
-  $('#a-reset',m).onclick=()=>confirmBox('Zerar o progresso?','Todas as estrelas, missões e baús abertos serão apagados. Os prêmios cadastrados continuam guardados.','Zerar',()=>{ S.progress={}; S.planetsSeen={}; S.opened={}; S.sim={best:null,last:null,tries:0,n:20}; save(); closeModal(); renderMap(); show('s-map'); },true);
+  $('#a-reset',m).onclick=()=>confirmBox('Zerar o progresso?','Todas as estrelas, missões e baús abertos serão apagados. Os prêmios cadastrados continuam guardados.','Zerar',()=>{ S.progress={}; S.planetsSeen={}; S.opened={}; S.sim={best:null,last:null,tries:0,n:20,keyed:false}; save(); closeModal(); renderMap(); show('s-map'); },true);
   $('#a-exp',m).onclick=()=>{ const b=new Blob([JSON.stringify(S)],{type:'application/json'}), a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='missao-estelar-backup.json'; document.body.appendChild(a); a.click(); a.remove(); };
   $('#a-imp',m).onchange=e=>{ const f=e.target.files[0]; if(!f) return; const fr=new FileReader(); fr.onload=()=>{ try{ const d=JSON.parse(fr.result); if(!d||typeof d!=='object'||!d.progress) throw 0; S=migrate(Object.assign(JSON.parse(JSON.stringify(DEFAULT)),d)); save(); closeModal(); renderMap(); show('s-map'); }catch(err){ alert('Esse arquivo não parece ser um backup do aplicativo.'); } }; fr.readAsText(f); };
   $('#a-voice',m).onchange=e=>{ S.voice=e.target.value; save(); };
