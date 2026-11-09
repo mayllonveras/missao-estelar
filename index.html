@@ -255,6 +255,35 @@ html,body{overflow-x:hidden;max-width:100vw}
 .admin td{padding:5px 6px;border-bottom:1px solid #eceeff}
 .admin td:last-child{text-align:right;white-space:nowrap}
 
+
+/* barra de estrelas com os 3 baús */
+.starbar{position:relative;height:56px;margin:4px 26px 0 4px}
+.starbar .track{position:absolute;left:0;right:0;top:50%;height:16px;transform:translateY(-50%);border-radius:99px;background:rgba(0,0,0,.35)}
+.starbar .track i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#ffd23f,#ff9ed2);transition:width .8s}
+.mchest{position:absolute;top:50%;width:50px;height:50px;margin:-25px 0 0 -25px;padding:0;border:0;background:none;cursor:pointer}
+.mchest svg{width:50px;height:auto;overflow:visible;transition:filter .4s}
+.mchest.locked svg{filter:grayscale(.9) brightness(.55)}
+.mchest.ready svg{filter:drop-shadow(0 0 8px #ffd23f);animation:wob 1.2s ease-in-out infinite}
+.mnext{font-size:15px;color:var(--gold);font-weight:600;margin-top:2px}
+.chests3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 6px}
+.cbox{display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 6px 10px;border:3px solid rgba(255,255,255,.25);border-radius:20px;background:rgba(255,255,255,.08);color:#fff;font:inherit;cursor:pointer}
+.cbox svg{width:100%;max-width:110px;height:auto;overflow:visible}
+.cbox b{font-size:19px}
+.cbox span{font-size:14px;font-weight:600;text-align:center;line-height:1.2}
+.cbox.locked svg{filter:grayscale(.9) brightness(.55)}
+.cbox.locked span{opacity:.8}
+.cbox.ready{border-color:var(--gold);background:rgba(255,210,63,.14)}
+.cbox.ready svg{filter:drop-shadow(0 0 10px #ffd23f);animation:wob 1.2s ease-in-out infinite}
+.cbox.ready span{color:var(--gold)}
+.cbox.opened span{color:#7cf0a9}
+.chints{font-size:15px;opacity:.85;text-align:center;margin:8px 6px 0}
+.res .rchest{margin:0 6px 18px;padding:10px 14px;border-radius:16px;background:rgba(255,255,255,.12);font-size:18px;font-weight:600}
+.res .rchest.up{background:rgba(255,210,63,.22);color:var(--gold);font-size:21px}
+.chest{transition:filter .6s}
+.tabs{display:flex;gap:6px;margin:10px 0 2px}
+.tabs button{flex:1;padding:10px 4px;border-radius:12px;border:3px solid #d9ddff;background:#f1f3ff;font:inherit;font-weight:700;color:#1c2150;cursor:pointer}
+.tabs button.sel{border-color:#ff5ea8;background:#ffe3f0}
+
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 @media (min-width:700px){body{font-size:20px}.nbtn{width:96px;height:96px}}
 </style>
@@ -601,14 +630,23 @@ const LESSONS=[
    ESTADO E ARMAZENAMENTO
    ===================================================================== */
 const KEY='missao-estrelas-v1';
-const DEFAULT={name:'',sound:true,voice:'',pin:'1234',claimed:false,planetsSeen:{},progress:{},prize:{emoji:'🎁',title:'',message:'',img:''}};
+const DEFAULT={name:'',sound:true,voice:'',pin:'1234',planetsSeen:{},progress:{},opened:{},prizes:[]};
+const BLANK_PRIZE=()=>({emoji:'🎁',title:'',message:'',img:''});
+function migrate(s){
+  if(!Array.isArray(s.prizes)) s.prizes=[];
+  for(let i=0;i<3;i++) s.prizes[i]=Object.assign(BLANK_PRIZE(), s.prizes[i]||{});
+  if(s.prize && (s.prize.title||s.prize.img) && !s.prizes[0].title && !s.prizes[0].img) s.prizes[0]=Object.assign(BLANK_PRIZE(), s.prize);
+  delete s.prize;
+  if(!s.opened||typeof s.opened!=='object') s.opened={};
+  if(s.claimed===true) s.opened[0]=true;
+  delete s.claimed;
+  return s;
+}
 let memStore=null;
 function loadS(){
   let r=null;
   try{ const t=localStorage.getItem(KEY); if(t) r=JSON.parse(t); }catch(e){ r=memStore; }
-  const s=Object.assign(JSON.parse(JSON.stringify(DEFAULT)), r||{});
-  s.prize=Object.assign({}, DEFAULT.prize, s.prize||{});
-  return s;
+  return migrate(Object.assign(JSON.parse(JSON.stringify(DEFAULT)), r||{}));
 }
 let S=loadS();
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ memStore=JSON.parse(JSON.stringify(S)); } }
@@ -677,6 +715,7 @@ const Snd={
       case 'star': T(1319,0,.14,'sine',.2); T(1760,.09,.28,'sine',.18); this.sparkle(4,.1); break;
       case 'complete': [523,659,784,1047,1319].forEach((f,i)=>T(f,i*.1,.3,'triangle',.18)); T(1047,.55,.7,'sine',.14); T(1319,.55,.7,'sine',.12); T(1568,.55,.7,'sine',.1); this.sparkle(10,.5); break;
       case 'planet': [392,523,659,784].forEach((f,i)=>T(f,i*.12,.25,'square',.08)); [523,659,784,1047].forEach((f,i)=>T(f,.55+i*.12,.35,'triangle',.18)); T(1047,1.1,1,'sine',.18); T(1319,1.1,1,'sine',.15); this.sparkle(14,1.1); break;
+      case 'unlock': T(880,0,.05,'square',.1); T(620,.09,.05,'square',.1); T(1040,.2,.06,'square',.1); this.glide(400,1500,.32,.45,'triangle',.16); [784,988,1175,1568].forEach((f,i)=>T(f,.7+i*.08,.5,'triangle',.16)); this.sparkle(14,.75); break;
       case 'drum': for(let i=0;i<10;i++) this.glide(140+i*14,60,i*.13,.14,'sine',.28); break;
       case 'final': {
         const m=[523,523,523,659,784,659,784,1047];
@@ -777,18 +816,26 @@ const fx=(function(){
 /* =====================================================================
    BAÚ (SVG)
    ===================================================================== */
-function chestSVG(cls){
-  return `<svg class="chest ${cls||''}" viewBox="0 0 200 170" role="img" aria-label="Baú do tesouro">
-  <defs><radialGradient id="gg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff7b0"/><stop offset="1" stop-color="#ffd23f" stop-opacity="0"/></radialGradient></defs>
-  <ellipse class="glow" cx="100" cy="80" rx="100" ry="60" fill="url(#gg)"/>
-  <rect x="30" y="92" width="140" height="66" rx="10" fill="#9a5a26" stroke="#4a2810" stroke-width="4"/>
-  <path d="M32 116 H168 M32 138 H168" stroke="#4a2810" stroke-width="3" opacity=".45"/>
-  <rect x="52" y="92" width="14" height="66" fill="#ffc933" stroke="#a86b00" stroke-width="3"/>
-  <rect x="134" y="92" width="14" height="66" fill="#ffc933" stroke="#a86b00" stroke-width="3"/>
+const TIERS=[
+  {name:'Baú de Bronze',short:'Bronze',medal:'🥉',body:'#9a5a26',lid:'#b36a2e',band:'#e89a58',bandS:'#7a3f12',line:'#4a2810',gem:'#ff8a3d'},
+  {name:'Baú de Prata',short:'Prata',medal:'🥈',body:'#5b6a8c',lid:'#7384a8',band:'#e8eef9',bandS:'#8793ad',line:'#262e4a',gem:'#3ee6ff'},
+  {name:'Baú de Ouro',short:'Ouro',medal:'🥇',body:'#7a3d12',lid:'#9a5420',band:'#ffd23f',bandS:'#a86b00',line:'#3a1d08',gem:'#ff5ea8'}
+];
+let svgUid=0;
+function chestSVG(cls,k){
+  const t=TIERS[k||0], id='gg'+(++svgUid);
+  return `<svg class="chest ${cls||''}" viewBox="0 0 200 170" role="img" aria-label="${t.name}">
+  <defs><radialGradient id="${id}" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff7b0"/><stop offset="1" stop-color="#ffd23f" stop-opacity="0"/></radialGradient></defs>
+  <ellipse class="glow" cx="100" cy="80" rx="100" ry="60" fill="url(#${id})"/>
+  <rect x="30" y="92" width="140" height="66" rx="10" fill="${t.body}" stroke="${t.line}" stroke-width="4"/>
+  <path d="M32 116 H168 M32 138 H168" stroke="${t.line}" stroke-width="3" opacity=".45"/>
+  <rect x="52" y="92" width="14" height="66" fill="${t.band}" stroke="${t.bandS}" stroke-width="3"/>
+  <rect x="134" y="92" width="14" height="66" fill="${t.band}" stroke="${t.bandS}" stroke-width="3"/>
   <ellipse class="coins" cx="100" cy="94" rx="66" ry="9" fill="#ffd23f" stroke="#a86b00" stroke-width="3"/>
-  <g class="lid"><path d="M30 92 V76 Q30 34 100 34 Q170 34 170 76 V92 Z" fill="#b36a2e" stroke="#4a2810" stroke-width="4"/>
-    <path d="M52 92 V52 Q52 44 60 41 H66 V92 Z" fill="#ffc933" stroke="#a86b00" stroke-width="3"/>
-    <path d="M148 92 V52 Q148 44 140 41 H134 V92 Z" fill="#ffc933" stroke="#a86b00" stroke-width="3"/></g>
+  <g class="lid"><path d="M30 92 V76 Q30 34 100 34 Q170 34 170 76 V92 Z" fill="${t.lid}" stroke="${t.line}" stroke-width="4"/>
+    <path d="M52 92 V52 Q52 44 60 41 H66 V92 Z" fill="${t.band}" stroke="${t.bandS}" stroke-width="3"/>
+    <path d="M148 92 V52 Q148 44 140 41 H134 V92 Z" fill="${t.band}" stroke="${t.bandS}" stroke-width="3"/>
+    <circle cx="100" cy="54" r="8" fill="${t.gem}" stroke="${t.line}" stroke-width="3"/></g>
   <g class="lock"><rect x="86" y="80" width="28" height="30" rx="6" fill="#ffd23f" stroke="#a86b00" stroke-width="3"/><circle cx="100" cy="92" r="4" fill="#4a2810"/><rect x="98" y="92" width="4" height="9" fill="#4a2810"/></g>
   </svg>`;
 }
@@ -816,7 +863,7 @@ function renderWelcome(){
     <div class="logo">🚀</div>
     <h1>Missão Estrelas</h1>
     <p>Prepare-se para o teste do 4º ano! Você vai viajar por ${PLANETS.length} planetas, cumprir ${TOTAL} missões e ganhar estrelas pelo caminho.</p>
-    <p>No fim da viagem, um baú guarda um <b style="color:#ffd23f">prêmio surpresa</b> esperando por você.</p>
+    <p>Pelo caminho você ganha estrelas e destrava <b style="color:#ffd23f">3 baús</b>. Cada um esconde um prêmio surpresa!</p>
     <input id="w-name" type="text" maxlength="20" placeholder="Qual é o seu nome, astronauta?" autocomplete="off" value="${esc(S.name)}">
     <button class="btn block" id="w-go">Começar a viagem! 🚀</button>
     <button class="btn ghost sm adm" id="w-adm">⚙️ Área do responsável</button>
@@ -834,15 +881,20 @@ function renderWelcome(){
    TELA: MAPA
    ===================================================================== */
 function starsRow(n){ let h=''; for(let i=1;i<=3;i++) h+=`<span class="${i<=n?'on':'off'}">⭐</span>`; return h; }
+const need = k => (k+1)*TOTAL;
+function chestState(k){ return totalStars()>=need(k) ? (S.opened[k]?'opened':'ready') : 'locked'; }
+function nextChestInfo(ts){ for(let k=0;k<3;k++) if(ts<need(k)) return {k:k,left:need(k)-ts}; return null; }
 function renderMap(scroll){
-  const root=$('#s-map'), ds=doneCount(), ts=totalStars();
+  const root=$('#s-map'), ts=totalStars(), nx=nextChestInfo(ts);
   const firstOpen = LESSONS.findIndex(l=>!doneOf(l.id));
   let h=`<div class="topbar">
     <div class="who"><div class="avatar">🧑‍🚀</div><div style="min-width:0"><div class="nm">${esc(S.name||'Astronauta')}</div><div class="lv">${levelFor(ts)}</div></div></div>
     <div class="tb-right"><div class="pill">⭐ ${ts}<small>/${MAXSTARS}</small></div>
     <button class="icon-btn" id="b-snd" aria-label="Ligar ou desligar o som">${S.sound?'🔊':'🔇'}</button>
     <button class="icon-btn" id="b-adm" aria-label="Área do responsável">⚙️</button></div></div>
-    <div class="mission"><div class="mtxt"><b>Missão Tesouro Estelar</b><span>${ds} de ${TOTAL} missões</span></div><div class="pbar"><i style="width:${(ds/TOTAL*100).toFixed(1)}%"></i><span class="pchest">🎁</span></div></div>`;
+    <div class="mission"><div class="mtxt"><b>Rumo aos 3 baús</b><span>${doneCount()} de ${TOTAL} missões</span></div>
+      <div class="starbar"><div class="track"><i style="width:${(ts/MAXSTARS*100).toFixed(1)}%"></i></div>${TIERS.map((t,k)=>`<button class="mchest ${chestState(k)}" style="left:${((k+1)/3*100).toFixed(2)}%" data-k="${k}" aria-label="${t.name}">${chestSVG(chestState(k)==='opened'?'open':'',k)}</button>`).join('')}</div>
+      <div class="mnext">${nx?`Próximo: ${TIERS[nx.k].name} · faltam ${nx.left} ⭐`:'Você destravou todos os baús!'}</div></div>`;
   const offs=[0,56,84,56,0,-56,-84,-56];
   PLANETS.forEach((p,pi)=>{
     const ls=LESSONS.filter(l=>l.planet===pi), pd=ls.filter(l=>doneOf(l.id)).length;
@@ -858,9 +910,9 @@ function renderMap(scroll){
     });
     h+=`</div>`;
   });
-  const ad=allDone();
-  h+=`<div class="planet" style="--pc:#ffd23f"><div class="pemoji">🎁</div><div><b>Tesouro Estelar</b><span>${ad?(S.claimed?'Você já abriu o baú!':'O baú está liberado!'):'Complete todas as missões'}</span></div></div>
-     <div class="path"><div class="node final ${ad?'open current':'locked'}"><button class="nbtn" id="b-chest" aria-label="Baú do tesouro">${chestSVG()}</button><div class="ntitle">${ad?(S.claimed?'Ver meu prêmio':'Toque para abrir!'):'Faltam '+(TOTAL-ds)+' missões'}</div></div></div>`;
+  h+=`<div class="planet" id="chests-sec" style="--pc:#ffd23f"><div class="pemoji">🎁</div><div><b>Baús do Tesouro</b><span>Cada baú guarda uma surpresa</span></div></div>
+    <div class="chests3">${TIERS.map((t,k)=>{ const st=chestState(k); const lab= st==='locked'?`Faltam ${need(k)-ts} ⭐`:(st==='ready'?'Toque para abrir!':'Ver prêmio ✓'); return `<button class="cbox ${st}" data-k="${k}">${chestSVG(st==='opened'?'open':'',k)}<b>${t.short}</b><span>${lab}</span></button>`; }).join('')}</div>
+    <p class="chints">Para destravar os baús, ganhe estrelas nas missões. Dá para repetir missões e conquistar as 3 estrelas!</p>`;
   root.innerHTML=h;
   $('#b-snd').onclick=()=>{ S.sound=!S.sound; save(); Snd.init(); Snd.play('click'); renderMap(false); };
   $('#b-adm').onclick=()=>{ Snd.init(); askPin(); };
@@ -869,9 +921,9 @@ function renderMap(scroll){
     if(!unlocked(i)){ Snd.play('lock'); b.parentNode.style.animation='shake .4s'; setTimeout(()=>b.parentNode.style.animation='',450); return; }
     Snd.play('next'); startLesson(i);
   });
-  $('#b-chest').onclick=()=>{ Snd.init(); openChestScreen(false); };
+  $$('.mchest,.cbox',root).forEach(b=>b.onclick=()=>{ Snd.init(); Snd.play(chestState(+b.dataset.k)==='locked'?'lock':'next'); chestQueue=[]; openChestScreen(+b.dataset.k); });
   if(scroll!==false){
-    const t = firstOpen>=0 ? $('#n-'+firstOpen) : $('#b-chest');
+    const t = firstOpen>=0 ? $('#n-'+firstOpen) : $('#chests-sec');
     if(t) setTimeout(()=>t.scrollIntoView({block:'center'}),60);
   }
 }
@@ -933,15 +985,20 @@ function answer(btn,k){
 }
 function finishLesson(){
   const lesson=L.lesson, stars=Math.max(1,L.firstOK), prev=starsOf(lesson.id), firstOK=L.firstOK, qn=L.qs.length;
+  const before=totalStars();
   S.progress[lesson.id]={done:true,stars:Math.max(prev,stars)}; save();
+  const after=totalStars();
+  const newly=[0,1,2].filter(k=>before<need(k)&&after>=need(k));
   const planet=PLANETS[lesson.planet], pl=LESSONS.filter(l=>l.planet===lesson.planet);
   const planetDone = pl.every(l=>doneOf(l.id)) && !S.planetsSeen[planet.id];
-  const root=$('#s-result'), ad=allDone();
+  const nx=nextChestInfo(after);
+  const root=$('#s-result');
   const msg = stars===3?'Missão perfeita! Três estrelas!':stars===2?'Muito bom! Falta pouco para as três estrelas.':'Missão cumprida! Tente de novo para ganhar mais estrelas.';
+  const chestLine = newly.length ? `<div class="rchest up">🎉 Você destravou o ${TIERS[newly[0]].name}!</div>` : (nx?`<div class="rchest">Próximo: ${TIERS[nx.k].name} · faltam ${nx.left} ⭐ (você tem ${after})</div>`:`<div class="rchest up">Todos os baús destravados!</div>`);
   root.innerHTML=`<div class="res"><div class="rt">Missão cumprida!</div><div class="rs">${esc(lesson.title)}</div>
     <div class="rstars"><span>⭐</span><span>⭐</span><span>⭐</span></div>
-    <div class="rm">${msg}</div><div class="rc">Você acertou ${firstOK} de ${qn} de primeira.</div>
-    <button class="btn green block" id="r-go">${ad&&!S.claimed&&!planetDone?'Ir ao Tesouro Estelar 🎁':'Continuar a viagem ➜'}</button>
+    <div class="rm">${msg}</div><div class="rc">Você acertou ${firstOK} de ${qn} de primeira.</div>${chestLine}
+    <button class="btn green block" id="r-go">${newly.length&&!planetDone?'Abrir o baú! 🎁':'Continuar a viagem ➜'}</button>
     ${stars<3?'<button class="btn ghost block" id="r-again">Jogar de novo para ganhar mais estrelas</button>':''}</div>`;
   show('s-result');
   const sp=$$('.rstars span',root);
@@ -954,7 +1011,7 @@ function finishLesson(){
   };
   const ra=$('#r-again'); if(ra) ra.onclick=()=>{ Snd.play('next'); startLesson(L.i); };
   function afterResult(){
-    if(allDone() && !S.claimed){ openChestScreen(false); }
+    if(newly.length){ chestQueue=newly.slice(); openChestScreen(chestQueue.shift(),{unlockAnim:true}); }
     else { renderMap(); show('s-map'); }
   }
 }
@@ -967,33 +1024,56 @@ function showMedal(planet,cb){
 /* =====================================================================
    TELA: BAÚ / PRÊMIO
    ===================================================================== */
-let chestBusy=false;
-function prizeCard(){
-  const p=S.prize;
+let chestBusy=false, chestQueue=[];
+function prizeCard(k){
+  const p=S.prizes[k];
   const pic = p.img ? `<img src="${p.img}" alt="Prêmio">` : `<div class="pe">${esc(p.emoji||'🎁')}</div>`;
   return `<div class="prize"><div class="card">${pic}<div class="ltag">Você ganhou:</div><h3>${esc(p.title)}</h3>${p.message?`<div class="pm">${esc(p.message)}</div>`:''}</div></div>`;
 }
-function openChestScreen(preview){
-  const root=$('#s-chest'), ad=allDone() || preview, hasPrize=!!(S.prize.title||S.prize.img);
-  const already = S.claimed && !preview;
-  root.innerHTML=`<div class="chestwrap ${ad?'':'locked'}" id="cw">
+function openChestScreen(k,opts){
+  opts=opts||{};
+  const root=$('#s-chest'), preview=!!opts.preview, t=TIERS[k], ts=totalStars(), nd=need(k);
+  const st=preview?'ready':chestState(k), p=S.prizes[k], hasPrize=!!(p.title||p.img);
+  const already=st==='opened', anim=!!opts.unlockAnim && st==='ready';
+  const lockedLook=st==='locked'||anim;
+  let title,msg;
+  if(st==='locked'){ title=t.name+' trancado'; msg=`Você tem ${ts} de ${nd} estrelas. Faltam ${nd-ts} ⭐ para destravar (média de ${k+1} por missão). Repita missões para ganhar mais estrelas.`; }
+  else if(anim){ title=t.name; msg='Você chegou à média de '+(k+1)+(k===0?' estrela':' estrelas')+' por missão...'; }
+  else if(already){ title='Seu prêmio'; msg='Toque no baú para ver a festa de novo.'; }
+  else { title='Baú destravado!'; msg='Toque no baú para abrir.'; }
+  chestBusy=anim;
+  root.innerHTML=`<div class="chestwrap ${lockedLook?'locked':''}" id="cw">
     <div style="text-align:left;position:relative;z-index:2"><button class="icon-btn" id="c-back" aria-label="Voltar">⬅</button></div>
     <div class="rays" id="rays"></div>
-    <h2 id="c-title">${!ad?'Baú trancado':(already?'Seu prêmio':'O Tesouro Estelar!')}</h2>
-    <p class="cm" id="c-msg">${!ad?`Faltam ${TOTAL-doneCount()} missões para abrir o baú.`:(already?'Você já abriu o baú. Toque nele para ver a festa de novo.':'Você chegou ao fim da viagem! Toque no baú para abrir.')}</p>
-    <div id="c-chest" style="position:relative">${chestSVG(ad?(already?'open':'ready'):'')}</div>
+    <h2 id="c-title">${title}</h2>
+    <p class="cm" id="c-msg">${msg}</p>
+    <div id="c-chest" style="position:relative">${chestSVG(already?'open':(st==='ready'&&!anim?'ready':''),k)}</div>
     <div id="c-prize"></div>
     ${preview?'<p class="cm" style="margin-top:14px"><b>Modo de teste:</b> assim o prêmio aparece para a criança.</p>':''}
   </div>`;
   show('s-chest');
   const svg=$('.chest',root), cw=$('#cw');
-  if(already){ $('#rays').classList.add('on'); $('#c-prize').innerHTML=prizeCard(); }
-  $('#c-back').onclick=()=>{ Snd.play('click'); if(preview){ renderMap(false); show('s-map'); askPin(true); } else { renderMap(false); show('s-map'); } };
+  if(already){ $('#rays').classList.add('on'); $('#c-prize').innerHTML=prizeCard(k); }
+  $('#c-back').onclick=()=>{
+    Snd.play('click'); chestBusy=false;
+    if(preview){ renderMap(false); show('s-map'); openAdmin(); return; }
+    if(chestQueue.length){ openChestScreen(chestQueue.shift(),{unlockAnim:true}); return; }
+    renderMap(false); show('s-map');
+  };
+  if(anim){
+    (async()=>{
+      await wait(1100);
+      Snd.play('unlock'); fx.at(svg,60,{speed:10,up:3});
+      cw.classList.remove('locked'); svg.classList.add('ready');
+      $('#c-title').textContent='Baú destravado!'; $('#c-msg').textContent='Toque no baú para abrir.';
+      chestBusy=false;
+    })();
+  }
   svg.onclick=async()=>{
     Snd.init();
     if(chestBusy) return;
-    if(!ad){ Snd.play('lock'); svg.style.animation='shake .4s'; setTimeout(()=>svg.style.animation='',450); return; }
-    if(!hasPrize){ $('#c-msg').textContent='Ainda não tem prêmio guardado aqui. Peça ao seu pai ou à sua mãe para cadastrar.'; Snd.play('wrong'); return; }
+    if(st==='locked'){ Snd.play('lock'); svg.style.animation='shake .4s'; setTimeout(()=>svg.style.animation='',450); return; }
+    if(!hasPrize){ $('#c-msg').textContent='O prêmio deste baú ainda não foi cadastrado. Peça ao seu pai ou à sua mãe.'; Snd.play('wrong'); return; }
     chestBusy=true;
     svg.classList.remove('ready','open'); $('#c-prize').innerHTML=''; $('#rays').classList.remove('on');
     $('#c-title').textContent='Abrindo...'; $('#c-msg').textContent='';
@@ -1003,10 +1083,10 @@ function openChestScreen(preview){
     fx.rain(6000); fx.at(svg,70,{speed:12,up:4});
     await wait(900);
     $('#c-title').textContent='Parabéns, '+(S.name||'astronauta')+'!';
-    $('#c-msg').textContent='Você completou a missão!';
-    $('#c-prize').innerHTML=prizeCard();
+    $('#c-msg').textContent='Você abriu o '+t.name+'!';
+    $('#c-prize').innerHTML=prizeCard(k);
     $('#c-prize').scrollIntoView({block:'center',behavior:'smooth'});
-    if(!preview){ S.claimed=true; save(); }
+    if(!preview){ S.opened[k]=true; save(); }
     chestBusy=false;
   };
 }
@@ -1042,42 +1122,52 @@ function readImage(file,cb){
 }
 const EMOJIS=['🎁','🍦','🍕','🎮','⚽','🚲','🎬','🏊','🧸','📚','🎢','🍫','🦖','🚀','🏆','🎨','🛹','🐶','🎂','🏖️'];
 function openAdmin(){
-  const draft={emoji:S.prize.emoji||'🎁',img:S.prize.img||''};
+  const drafts=S.prizes.map(p=>Object.assign({},p));
+  let cur=0;
   const rows=LESSONS.map(l=>`<tr><td>${esc(l.title)}</td><td>${doneOf(l.id)?'⭐'.repeat(starsOf(l.id)):'—'}</td></tr>`).join('');
+  const stl=k=>{ const x=chestState(k); return TIERS[k].medal+' '+TIERS[k].short+': '+(x==='locked'?'trancado':(x==='ready'?'destravado, ainda não aberto':'aberto')); };
   const m=openModal(`<div class="admin"><h3>Área do responsável</h3>
     ${S.pin==='1234'?'<div class="warn">O PIN ainda é o padrão (1234). Troque por outro na seção Segurança, no fim desta página.</div>':''}
-    <div class="sec"><h4>🎁 Prêmio surpresa</h4>
-      <p class="hint">A criança só vê o prêmio depois de completar todas as missões e abrir o baú.</p>
-      <label for="a-title">O que ela vai ganhar?</label><input type="text" id="a-title" maxlength="80" placeholder="Ex.: Um passeio no parque de diversões" value="${esc(S.prize.title)}">
-      <label for="a-msg">Mensagem para ela (opcional)</label><textarea id="a-msg" maxlength="400" placeholder="Ex.: Parabéns pelo esforço! Combinamos o dia juntos.">${esc(S.prize.message)}</textarea>
-      <label>Ícone do prêmio</label><div class="emojis" id="a-emo">${EMOJIS.map(e=>`<button type="button" data-e="${e}" class="${e===draft.emoji?'sel':''}">${e}</button>`).join('')}</div>
-      <label for="a-img">Foto do prêmio (opcional, aparece no lugar do ícone)</label><input type="file" id="a-img" accept="image/*">
-      <div id="a-prev">${draft.img?`<img class="prev" src="${draft.img}" alt="">`:''}</div>
-      ${draft.img?'<button type="button" class="btn sm ghost" id="a-rmimg" style="color:#2a2f8f;background:#eef0ff;box-shadow:none;margin-top:6px">Remover foto</button>':''}
-      <div class="btns"><button class="btn green sm" id="a-save">Salvar prêmio</button><button class="btn sm ghost" id="a-test" style="color:#2a2f8f;background:#eef0ff;box-shadow:none">Ver como a criança verá</button></div>
+    <div class="sec"><h4>🎁 Prêmios dos 3 baús</h4>
+      <p class="hint">A criança só vê o que há dentro de cada baú quando ele é destravado.<br>🥉 Bronze: média de 1 estrela por missão (${need(0)} ⭐)<br>🥈 Prata: média de 2 estrelas (${need(1)} ⭐)<br>🥇 Ouro: 3 estrelas em todas as missões (${need(2)} ⭐)</p>
+      <div class="tabs" id="a-tabs">${TIERS.map((t,k)=>`<button type="button" data-t="${k}" class="${k===0?'sel':''}">${t.medal} ${t.short}</button>`).join('')}</div>
+      <div id="a-prize"></div>
+      <div class="btns"><button class="btn green sm" id="a-save">Salvar prêmios</button><button class="btn sm ghost" id="a-test" style="color:#2a2f8f;background:#eef0ff;box-shadow:none">Ver este baú como a criança verá</button></div>
     </div>
     <div class="sec"><h4>👦 Criança</h4><label for="a-name">Nome</label><input type="text" id="a-name" maxlength="20" value="${esc(S.name)}"><div class="btns"><button class="btn sm" id="a-sname">Salvar nome</button></div></div>
-    <div class="sec"><h4>📈 Progresso</h4><p class="hint">${doneCount()} de ${TOTAL} missões · ${totalStars()} de ${MAXSTARS} estrelas</p><table>${rows}</table>
+    <div class="sec"><h4>📈 Progresso</h4><p class="hint">${doneCount()} de ${TOTAL} missões · ${totalStars()} de ${MAXSTARS} estrelas<br>${[0,1,2].map(stl).join('<br>')}</p><table>${rows}</table>
       <div class="btns"><button class="btn sm red" id="a-reset">Zerar progresso</button></div></div>
     <div class="sec"><h4>🔊 Voz da leitura</h4><p class="hint">É a voz do próprio aparelho. Se uma voz soar robótica, teste as outras da lista. As que têm Google, Natural ou Neural costumam ser melhores.</p>
       <label for="a-voice">Voz</label><select id="a-voice" style="width:100%;font:inherit;font-size:18px;padding:10px;border-radius:14px;border:3px solid #d9ddff;color:#1c2150;background:#fff"><option value="">Automática (a melhor encontrada)</option>${VOICES.map(v=>`<option value="${esc(v.name)}" ${v.name===S.voice?'selected':''}>${esc(v.name)} (${esc(v.lang)})</option>`).join('')}</select>
       ${VOICES.length?'':'<p class="hint">Este aparelho não informou vozes em português. Instale uma voz em Configurações → Idioma → Saída de texto para voz.</p>'}
       <div class="btns"><button class="btn sm" id="a-vtest">Testar voz</button></div></div>
-    <div class="sec"><h4>💾 Backup</h4><p class="hint">Os dados ficam salvos neste aparelho e navegador. Para levar o prêmio e o progresso para outro aparelho, baixe o backup e restaure lá.</p>
+    <div class="sec"><h4>💾 Backup</h4><p class="hint">Os dados ficam salvos neste aparelho e navegador. Para levar os prêmios e o progresso para outro aparelho, baixe o backup e restaure lá.</p>
       <div class="btns"><button class="btn sm" id="a-exp">Baixar backup</button><label class="btn sm ghost" style="color:#2a2f8f;background:#eef0ff;box-shadow:none;margin:0;display:inline-block;cursor:pointer">Restaurar backup<input type="file" id="a-imp" accept="application/json" style="display:none"></label></div></div>
     <div class="sec"><h4>🔒 Segurança</h4><label for="a-pin">Novo PIN (4 números)</label><input type="password" id="a-pin" inputmode="numeric" maxlength="4" placeholder="••••"><div class="btns"><button class="btn sm" id="a-spin">Trocar PIN</button></div></div>
     <div class="row"><button class="btn" id="a-close">Fechar</button></div></div>`);
   const flash=(el,t)=>{ const o=el.textContent; el.textContent=t; setTimeout(()=>{ el.textContent=o; },1600); };
-  $$('#a-emo button',m).forEach(b=>b.onclick=()=>{ draft.emoji=b.dataset.e; $$('#a-emo button',m).forEach(x=>x.classList.toggle('sel',x===b)); Snd.play('click'); });
-  $('#a-img',m).onchange=e=>{ const f=e.target.files[0]; if(!f) return; readImage(f,d=>{ draft.img=d; $('#a-prev',m).innerHTML=`<img class="prev" src="${d}" alt="">`; }); };
-  const rm=$('#a-rmimg',m); if(rm) rm.onclick=()=>{ draft.img=''; $('#a-prev',m).innerHTML=''; rm.remove(); };
-  function savePrize(){ S.prize={emoji:draft.emoji,img:draft.img,title:$('#a-title',m).value.trim(),message:$('#a-msg',m).value.trim()}; save(); }
-  $('#a-save',m).onclick=function(){ savePrize(); Snd.play('correct'); flash(this,'Salvo! ✓'); };
-  $('#a-test',m).onclick=()=>{ savePrize(); if(!S.prize.title&&!S.prize.img){ alert('Escreva o que ela vai ganhar para testar.'); return; } closeModal(); openChestScreen(true); };
+  function commit(){ const t=$('#a-title',m); if(!t) return; const d=drafts[cur]; d.title=t.value.trim(); d.message=$('#a-msg',m).value.trim(); }
+  function renderPrize(){
+    const d=drafts[cur], t=TIERS[cur];
+    $('#a-prize',m).innerHTML=`<label for="a-title">O que está dentro do ${t.name}?</label><input type="text" id="a-title" maxlength="80" placeholder="Ex.: Um passeio no parque de diversões" value="${esc(d.title)}">
+      <label for="a-msg">Mensagem para ele (opcional)</label><textarea id="a-msg" maxlength="400" placeholder="Ex.: Parabéns pelo esforço! Combinamos o dia juntos.">${esc(d.message)}</textarea>
+      <label>Ícone do prêmio</label><div class="emojis" id="a-emo">${EMOJIS.map(e=>`<button type="button" data-e="${e}" class="${e===d.emoji?'sel':''}">${e}</button>`).join('')}</div>
+      <label for="a-img">Foto do prêmio (opcional, aparece no lugar do ícone)</label><input type="file" id="a-img" accept="image/*">
+      <div id="a-prev">${d.img?`<img class="prev" src="${d.img}" alt="">`:''}</div>
+      ${d.img?'<button type="button" class="btn sm ghost" id="a-rmimg" style="color:#2a2f8f;background:#eef0ff;box-shadow:none;margin-top:6px">Remover foto</button>':''}`;
+    $$('#a-emo button',m).forEach(b=>b.onclick=()=>{ commit(); d.emoji=b.dataset.e; Snd.play('click'); renderPrize(); });
+    $('#a-img',m).onchange=e=>{ const f=e.target.files[0]; if(!f) return; commit(); readImage(f,x=>{ d.img=x; renderPrize(); }); };
+    const rm=$('#a-rmimg',m); if(rm) rm.onclick=()=>{ commit(); d.img=''; renderPrize(); };
+  }
+  renderPrize();
+  $$('#a-tabs button',m).forEach(b=>b.onclick=()=>{ commit(); cur=+b.dataset.t; $$('#a-tabs button',m).forEach(x=>x.classList.toggle('sel',x===b)); renderPrize(); });
+  function savePrizes(){ commit(); S.prizes=drafts.map(d=>Object.assign({},d)); save(); }
+  $('#a-save',m).onclick=function(){ savePrizes(); Snd.play('correct'); flash(this,'Salvo! ✓'); };
+  $('#a-test',m).onclick=()=>{ savePrizes(); const p=S.prizes[cur]; if(!p.title&&!p.img){ alert('Escreva o que está dentro deste baú para testar.'); return; } closeModal(); openChestScreen(cur,{preview:true}); };
   $('#a-sname',m).onclick=function(){ S.name=$('#a-name',m).value.trim()||'Astronauta'; save(); flash(this,'Salvo! ✓'); };
-  $('#a-reset',m).onclick=()=>confirmBox('Zerar o progresso?','Todas as estrelas e missões concluídas serão apagadas. O prêmio cadastrado continua guardado.','Zerar',()=>{ S.progress={}; S.planetsSeen={}; S.claimed=false; save(); closeModal(); renderMap(); show('s-map'); },true);
+  $('#a-reset',m).onclick=()=>confirmBox('Zerar o progresso?','Todas as estrelas, missões e baús abertos serão apagados. Os prêmios cadastrados continuam guardados.','Zerar',()=>{ S.progress={}; S.planetsSeen={}; S.opened={}; save(); closeModal(); renderMap(); show('s-map'); },true);
   $('#a-exp',m).onclick=()=>{ const b=new Blob([JSON.stringify(S)],{type:'application/json'}), a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='missao-estrelas-backup.json'; document.body.appendChild(a); a.click(); a.remove(); };
-  $('#a-imp',m).onchange=e=>{ const f=e.target.files[0]; if(!f) return; const fr=new FileReader(); fr.onload=()=>{ try{ const d=JSON.parse(fr.result); if(!d||typeof d!=='object'||!d.progress) throw 0; S=Object.assign(JSON.parse(JSON.stringify(DEFAULT)),d); S.prize=Object.assign({},DEFAULT.prize,d.prize||{}); save(); closeModal(); renderMap(); show('s-map'); }catch(err){ alert('Esse arquivo não parece ser um backup do aplicativo.'); } }; fr.readAsText(f); };
+  $('#a-imp',m).onchange=e=>{ const f=e.target.files[0]; if(!f) return; const fr=new FileReader(); fr.onload=()=>{ try{ const d=JSON.parse(fr.result); if(!d||typeof d!=='object'||!d.progress) throw 0; S=migrate(Object.assign(JSON.parse(JSON.stringify(DEFAULT)),d)); save(); closeModal(); renderMap(); show('s-map'); }catch(err){ alert('Esse arquivo não parece ser um backup do aplicativo.'); } }; fr.readAsText(f); };
   $('#a-voice',m).onchange=e=>{ S.voice=e.target.value; save(); };
   $('#a-vtest',m).onclick=()=>{ Snd.init(); speak('Olá, '+(S.name||'astronauta')+'! Vamos estudar juntos? Dez dezenas formam uma centena. Um lápis custa R$ 2,50.'); };
   $('#a-spin',m).onclick=function(){ const v=$('#a-pin',m).value; if(!/^\d{4}$/.test(v)){ alert('O PIN precisa ter exatamente 4 números.'); return; } S.pin=v; save(); flash(this,'PIN trocado ✓'); $('#a-pin',m).value=''; };
