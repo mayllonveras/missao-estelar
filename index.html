@@ -286,6 +286,15 @@ html,body{overflow-x:hidden;max-width:100vw}
 
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 @media (min-width:700px){body{font-size:20px}.nbtn{width:96px;height:96px}}
+
+.simcard{display:flex;align-items:center;gap:12px;width:100%;margin:8px 0 4px;padding:12px 14px;border:0;border-radius:20px;font:inherit;color:#fff;text-align:left;cursor:pointer;background:linear-gradient(135deg,#8f6bff,#ff5ea8);box-shadow:0 5px 0 rgba(0,0,0,.25)}
+.simcard:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.25)}
+.simcard .se{font-size:34px}.simcard .st{flex:1;min-width:0}.simcard .st b{display:block;font-size:20px}.simcard .st small{display:block;font-size:14px;opacity:.92}.simcard .sg{font-size:24px}
+.simscore{margin:6px 0 4px}.simscore b{font-size:88px;line-height:1;color:var(--gold)}.simscore span{font-size:26px;margin-left:8px}
+.simh{margin:26px 0 8px;font-size:24px;color:var(--gold);text-align:left}
+.res .card.mist{text-align:left;margin:0 0 12px;padding:14px 16px;font-size:18px}
+.mist .sml{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.mist .smq{font-size:20px;font-weight:600;margin:4px 0 8px}.mist .smx{color:#c0392b}.mist .smo{color:#0d5a2e;font-weight:700}.mist .smw{margin-top:6px;color:var(--muted);font-size:16px}
 </style>
 </head>
 <body>
@@ -627,10 +636,430 @@ const LESSONS=[
 ];
 
 /* =====================================================================
+   BANCO DE PERGUNTAS EXTRAS, GERADORES E SORTEIO
+   ===================================================================== */
+const R=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const fmt=n=>String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+const brl=c=>'R$ '+(c/100).toFixed(2).replace('.',',');
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+/* monta as 4 opções: a certa primeiro, depois 3 erradas distintas (pref na ordem, depois fb sorteado) */
+function opts(right,pref,fb,f){
+  f=f||String; const r=f(right), seen=new Set([r]), w=[];
+  pref.concat(shuffle((fb||[]).slice())).forEach(c=>{
+    if(c===null||c===undefined||c===''||(typeof c==='number'&&(!isFinite(c)||c<=0))) return;
+    const s=f(c); if(s&&!seen.has(s)){ seen.add(s); w.push(s); }
+  });
+  return [r].concat(w.slice(0,3));
+}
+const nums=(k,lo,hi)=>{ const s=new Set(); while(s.size<k) s.add(R(lo,hi)); return Array.from(s); };
+function distinctDigits(len){ let d; do{ d=shuffle([0,1,2,3,4,5,6,7,8,9]).slice(0,len); }while(d[0]===0); return d; }
+
+/* ---------- extenso ---------- */
+const U19=['zero','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+const T9=['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+const H9=['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+function ext(n){
+  if(n<20) return U19[n];
+  if(n<100){ const t=Math.floor(n/10), u=n%10; return T9[t]+(u?' e '+U19[u]:''); }
+  if(n===100) return 'cem';
+  if(n<1000){ const h=Math.floor(n/100), r=n%100; return H9[h]+(r?' e '+ext(r):''); }
+  const m=Math.floor(n/1000), r=n%1000;
+  let s=(m===1?'mil':ext(m)+' mil');
+  if(r===0) return s;
+  return s+((r<100||r%100===0)?' e ':', ')+ext(r);
+}
+/* ---------- romanos ---------- */
+function toRoman(n){ let s=''; [[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']].forEach(p=>{ while(n>=p[0]){ s+=p[1]; n-=p[0]; } }); return s; }
+function naiveRoman(n){ let s=''; [[50,'L'],[10,'X'],[5,'V'],[1,'I']].forEach(p=>{ while(n>=p[0]){ s+=p[1]; n-=p[0]; } }); return s; }
+function addRoman(s){ const v={I:1,V:5,X:10,L:50}; let t=0; for(const c of s) t+=v[c]; return t; }
+
+/* ---------- geradores: cada chamada devolve uma pergunta nova ---------- */
+function gDec1(){
+  const d=distinctDigits(3), n=+d.join(''), pos=R(0,2), nm=['centenas','dezenas','unidades'];
+  return {q:`No número ${n}, o algarismo <b>${d[pos]}</b> está na ordem das:`,
+    o:[nm[pos]].concat(['centenas','dezenas','unidades','milhares'].filter(x=>x!==nm[pos]).slice(0,3)),
+    why:`O ${n} tem ${d[0]} centenas, ${d[1]} dezenas e ${d[2]} unidades. O ${d[pos]} está na ordem das ${nm[pos]}.`};
+}
+function gDec2(){
+  const a=R(1,9), b=R(0,9), c=R(0,9), n=100*a+10*b+c;
+  return {q:`O número com <b>${a} centenas, ${b} dezenas e ${c} unidades</b> é:`,
+    o:opts(n,[100*a+10*c+b,100*b+10*a+c,100*c+10*b+a,100*a+b+c,a+b+c],[n+10,n-10,n+100,n-100],fmt),
+    why:`${a} centenas = ${100*a}; ${b} dezenas = ${10*b}; ${c} unidades = ${c}. Juntando: ${n}.`};
+}
+function gOrdcl1(){
+  const d=distinctDigits(5), n=+d.join(''), pos=R(0,4), nm=['dezenas de milhar','unidades de milhar','centenas','dezenas','unidades'];
+  const all=['unidades de milhar','dezenas de milhar','centenas','dezenas','unidades','centenas de milhar'];
+  return {q:`No número ${fmt(n)}, o algarismo <b>${d[pos]}</b> está na ordem das:`,
+    o:[nm[pos]].concat(shuffle(all.filter(x=>x!==nm[pos])).slice(0,3)),
+    why:`Da direita para a esquerda: unidades, dezenas, centenas, unidades de milhar, dezenas de milhar. O ${d[pos]} está nas ${nm[pos]}.`};
+}
+function gOrdcl2(){
+  const k=R(3,6), n=R(Math.pow(10,k-1),Math.pow(10,k)-1);
+  return {q:`Quantas ordens (algarismos) tem o número ${fmt(n)}?`,
+    o:opts(k,[k+1,k-1,k+2],[k+3,k-2],String),
+    why:`Conte os algarismos de ${fmt(n)}: são ${k}, então o número tem ${k} ordens.`};
+}
+function gLeit1(){
+  const n=R(1000,9999);
+  const dg=String(n).split('').map(Number);
+  const sw=(i,j)=>{ const x=dg.slice(); [x[i],x[j]]=[x[j],x[i]]; return +x.join(''); };
+  const z=(i)=>{ const x=dg.slice(); x[i]=0; return +x.join(''); };
+  return {q:`Como se escreve “${ext(n)}” com algarismos?`,
+    o:opts(n,[sw(1,2),sw(2,3),z(2),z(1)],[n+10,n-10,n+100,n-100,n+1],fmt),
+    why:`Leia por classes: ${ext(n)} = ${fmt(n)}.`};
+}
+function gLeit2(){
+  const n=R(101,999), d=String(n).split('').map(Number);
+  const sw=(i,j)=>{ const x=d.slice(); [x[i],x[j]]=[x[j],x[i]]; return +x.join(''); };
+  return {q:`Como se escreve o número ${n} por extenso?`,
+    o:opts(ext(n),[sw(0,1),sw(1,2),sw(0,2)].filter(x=>x>=100).map(ext),[n+10,n-10,n+100].filter(x=>x>=100).map(ext),String),
+    why:`${n} se lê: ${ext(n)}.`};
+}
+function parts4(n){ const d=String(n).padStart(4,'0').split('').map(Number); return [d[0]*1000,d[1]*100,d[2]*10,d[3]].filter(x=>x>0).map(fmt).join(' + '); }
+function gComp1(){
+  let d; do{ d=[R(1,9),R(0,9),R(0,9),R(0,9)]; }while(!d.slice(1).some(x=>x>0));
+  const n=d[0]*1000+d[1]*100+d[2]*10+d[3];
+  const sw=(i,j)=>{ const x=d.slice(); [x[i],x[j]]=[x[j],x[i]]; return x[0]>0?+x.join(''):0; };
+  const pref=shuffle([sw(1,2),sw(2,3),sw(1,3),sw(0,1)].filter(m=>m>0&&m!==n));
+  return {q:`Como decompor ${fmt(n)}?`,o:opts(parts4(n),pref.map(parts4),[n+10,n-10,n+100,n-100,n+1].map(parts4),String),
+    why:`${fmt(n)} = ${parts4(n)}. Cada algarismo vale conforme o seu lugar.`};
+}
+function gComp2(){
+  const d=[R(1,9),R(0,9),R(1,9),R(1,9)], n=d[0]*1000+d[1]*100+d[2]*10+d[3];
+  const part=[d[0]*1000,d[1]*100,d[2]*10,d[3]].filter(x=>x>0);
+  const sw=(i,j)=>{ const x=d.slice(); [x[i],x[j]]=[x[j],x[i]]; return +x.join(''); };
+  return {q:`${part.map(fmt).join(' + ')} = ?`,
+    o:opts(n,[sw(1,2),sw(2,3),sw(0,1),d[0]*1000+d[2]*10+d[3]],[n+10,n-10,n+100],fmt),
+    why:`Some as partes: ${part.map(fmt).join(' + ')} = ${fmt(n)}.`};
+}
+function gAntSuc1(){
+  const t=R(0,3); let n;
+  if(t===0) n=R(2,98)*100; else if(t===1) n=R(1,9)*1000; else if(t===2) n=R(1,9)*1000-1; else n=R(21,9998);
+  const suc=R(0,1), r=suc?n+1:n-1;
+  return {q:`Qual é o ${suc?'sucessor':'antecessor'} de ${fmt(n)}?`,
+    o:opts(r,[suc?n-1:n+1,suc?n+10:n-10,suc?n+2:n-2],[n+100,n-100],fmt),
+    why:suc?`Sucessor é o que vem depois: ${fmt(n)} + 1 = ${fmt(r)}.`:`Antecessor é o que vem antes: ${fmt(n)} − 1 = ${fmt(r)}.`};
+}
+function gAntSuc2(){
+  const n=R(20,9990), k=R(0,1);
+  return {q:k?`Qual número tem sucessor ${fmt(n+1)}?`:`Qual número tem antecessor ${fmt(n-1)}?`,
+    o:opts(n,[k?n+1:n-1,k?n-1:n+1,k?n+2:n-2],[n+10,n-10],fmt),
+    why:k?`O sucessor é o número mais 1. Então o número é ${fmt(n+1)} − 1 = ${fmt(n)}.`:`O antecessor é o número menos 1. Então o número é ${fmt(n-1)} + 1 = ${fmt(n)}.`};
+}
+function gParImp1(){
+  const par=R(0,1), pool=[];
+  while(pool.length<4){ const x=R(10,9999); if(!pool.includes(x)) pool.push(x); }
+  const right=pool[0]-(pool[0]%2)+(par?0:1);
+  const o=[right]; let g=0;
+  while(o.length<4&&g++<200){ const x=R(10,9999), y=x-(x%2)+(par?1:0); if(!o.includes(y)) o.push(y); }
+  return {q:`Qual destes números é <b>${par?'par':'ímpar'}</b>?`,o:o.map(fmt),
+    why:`Olhe o último algarismo: ${par?'0, 2, 4, 6 ou 8 é par':'1, 3, 5, 7 ou 9 é ímpar'}. ${fmt(right)} termina em ${right%10}.`};
+}
+function gParImp2(){
+  const n=R(10,999), par=R(0,1);
+  const r = par ? (n%2===0?n+2:n+1) : (n%2===1?n+2:n+1);
+  return {q:`Qual é o próximo número <b>${par?'par':'ímpar'}</b> depois de ${n}?`,
+    o:opts(r,[r+1,r-1,r+2],[r+3,r+4],String),
+    why:`Pares e ímpares se alternam. Depois de ${n}, o próximo ${par?'par':'ímpar'} é ${r}.`};
+}
+function gOrdem1(){
+  const big=R(0,1), a=nums(4,big?1000:100,big?9999:999), cres=R(0,1);
+  let s=a.slice().sort((x,y)=>x-y); if(!cres) s.reverse();
+  const j=x=>x.map(fmt).join(', '), right=j(s), opp=j(s.slice().reverse());
+  const cand=[opp]; let g=0;
+  while(cand.length<12&&g++<80){ const p=j(shuffle(a.slice())); if(p!==right&&!cand.includes(p)) cand.push(p); }
+  const sw=s.slice(); [sw[1],sw[2]]=[sw[2],sw[1]];
+  return {q:`Qual sequência está em ordem <b>${cres?'crescente':'decrescente'}</b>?`,
+    o:opts(right,[opp,j(sw)],cand.slice(1),String),
+    why:cres?`Crescente é do menor para o maior: ${right}.`:`Decrescente é do maior para o menor: ${right}.`};
+}
+function gOrdem2(){
+  const d=distinctDigits(4), e=d.slice(), i=R(1,2); [e[i],e[i+1]]=[e[i+1],e[i]];
+  const x=+d.join(''), y=+e.join(''), big=x>y;
+  return {q:`Qual sinal completa: ${fmt(x)} __ ${fmt(y)}?`,o:[big?'&gt;':'&lt;',big?'&lt;':'&gt;','=','+'],
+    why:`Compare da esquerda para a direita. ${fmt(Math.max(x,y))} é maior que ${fmt(Math.min(x,y))}, então ${fmt(x)} ${big?'&gt;':'&lt;'} ${fmt(y)}.`};
+}
+function gOrdem3(){
+  const big=R(0,1), a=nums(4,big?1000:100,big?9999:999), mx=R(0,1);
+  const r=mx?Math.max.apply(null,a):Math.min.apply(null,a);
+  return {q:`Qual é o <b>${mx?'maior':'menor'}</b> destes números?`,o:[r].concat(a.filter(x=>x!==r)).map(fmt),
+    why:`O ${mx?'maior':'menor'} é ${fmt(r)}.`};
+}
+function gRom1(){
+  const n=R(3,39), s=toRoman(n);
+  return {q:`Qual número o símbolo <b>${s}</b> representa?`,o:opts(n,[addRoman(s)!==n?addRoman(s):n+1,n+1,n-1],[n+2,n-2,n+10,n-10],String),
+    why:`${s} = ${n}. Letra menor à esquerda subtrai e à direita soma.`};
+}
+function gRom2(){
+  const n=R(3,39), s=toRoman(n);
+  return {q:`Como se escreve o número <b>${n}</b> em algarismos romanos?`,o:opts(s,[naiveRoman(n),toRoman(n+1),toRoman(n-1)],[toRoman(n+2),toRoman(n-2),toRoman(n+10)],String),
+    why:`${n} = ${s}.`};
+}
+function gDin1(){
+  const a=R(2,30)*50, b=R(2,30)*50, who=pick(['Ana','Pedro','Lia','Davi','Bia']), it=pick([['um caderno','uma caneta'],['um lápis','uma borracha'],['uma bola','um boné'],['um livro','um marcador de página']]);
+  return {q:`${who} comprou ${it[0]} de ${brl(a)} e ${it[1]} de ${brl(b)}. Quanto gastou?`,
+    o:opts(a+b,[a+b+50,a+b-50,a+b+100],[Math.abs(a-b),a+b-100],brl),
+    why:`Adição: ${brl(a)} + ${brl(b)} = ${brl(a+b)}.`};
+}
+function gDin2(){
+  const P=pick([1000,2000,5000]), c=R(6,Math.floor((P-100)/50))*50, who=pick(['Paulo','Marina','Caio','Lia']);
+  return {q:`${who} pagou com ${brl(P)} um brinquedo de ${brl(c)}. Qual foi o troco?`,
+    o:opts(P-c,[c,P-c+50,P-c-50],[P-c+100,P-c-100,P+c],brl),
+    why:`Troco = o que pagou menos o preço: ${brl(P)} − ${brl(c)} = ${brl(P-c)}.`};
+}
+function gDin3(){
+  const coin=pick([25,50,10,5]), k=R(1,5), n=100/coin*k;
+  const others=[25,50,10,5].filter(c=>c!==coin).map(c=>100/c*k);
+  return {q:`Quantas moedas de ${coin} centavos formam ${brl(k*100)}?`,o:opts(n,others,[n+1],fmt),
+    why:`R$ 1,00 tem ${100/coin} moedas de ${coin} centavos. Então ${k} reais têm ${n} moedas.`};
+}
+function gDin4(){
+  const v=R(1,19)*50;
+  return {q:`${brl(v)} é o mesmo que quantos centavos?`,o:opts(v,[v*10,Math.floor(v/10),v+50],[v-50,v+100],fmt),
+    why:`Cada real tem 100 centavos. ${brl(v)} = ${fmt(v)} centavos.`};
+}
+function gAdd1(){
+  const A=R(120,899), B=R(120,899), S=A+B;
+  const cl=(a,b)=>{ let r='',x=String(a),y=String(b); const L=Math.max(x.length,y.length); x=x.padStart(L,'0'); y=y.padStart(L,'0'); for(let i=0;i<L;i++) r+=(+x[i]+ +y[i])%10; return +r; };
+  return {q:`${fmt(A)} + ${fmt(B)} = ?`,o:opts(S,[cl(A,B),S+10,S-10],[S+100,S-100,S+1],fmt),
+    why:`Some unidade com unidade, dezena com dezena, centena com centena, sem esquecer o “vai um”: ${fmt(A)} + ${fmt(B)} = ${fmt(S)}.`};
+}
+function gAdd2(){
+  const A=R(20,499), B=R(20,499), t=R(0,3);
+  const q=[`Uma escola tem ${A} alunos de manhã e ${B} à tarde. Quantos alunos há ao todo?`,
+           `Lia tinha ${A} figurinhas e ganhou mais ${B}. Com quantas ela ficou?`,
+           `Na biblioteca há ${A} livros de histórias e ${B} de ciências. Quantos livros há ao todo?`,
+           `Um mercado vendeu ${A} garrafas de suco na segunda-feira e ${B} na terça-feira. Quantas garrafas vendeu nos dois dias?`][t];
+  return {q:q,o:opts(A+B,[Math.abs(A-B),A+B+10,A+B-10],[A+B+100,A+B-100],fmt),
+    why:`Palavras como “ao todo” e “ganhou” pedem adição: ${A} + ${B} = ${A+B}.`};
+}
+function gSub1(){
+  let A,B,g=0; do{ A=R(300,999); B=R(100,A-1); g++; }while(!((A%10<B%10)||(Math.floor(A/10)%10<Math.floor(B/10)%10))&&g<500);
+  const D=A-B;
+  const dl=(a,b)=>{ const x=String(a),y=String(b).padStart(x.length,'0'); let r=''; for(let i=0;i<x.length;i++) r+=Math.abs(+x[i]- +y[i]); return +r; };
+  return {q:`${fmt(A)} − ${fmt(B)} = ?`,o:opts(D,[dl(A,B),D+10,D-10],[D+100,D-100,A+B],fmt),
+    why:`Quando o número de cima é menor, troque (empreste) da ordem seguinte. ${fmt(A)} − ${fmt(B)} = ${fmt(D)}. Prova real: ${fmt(D)} + ${fmt(B)} = ${fmt(A)}.`};
+}
+function gSub2(){
+  const A=R(120,950), B=R(20,A-20), t=R(0,3), D=A-B;
+  const q=[`Uma padaria fez ${A} pães e vendeu ${B}. Quantos pães sobraram?`,
+           `Pedro tem ${A} bolinhas de gude e Caio tem ${B}. Quantas bolinhas Pedro tem a mais?`,
+           `Um álbum tem ${A} figurinhas e Bia já colou ${B}. Quantas faltam para completar?`,
+           `Um ônibus saiu com ${A} passageiros e, na primeira parada, desceram ${B}. Quantos passageiros ficaram?`][t];
+  return {q:q,o:opts(D,[A+B,D+10,D-10],[D+100,D-100,D+1],fmt),
+    why:`Palavras como “sobraram”, “a mais” e “faltam” pedem subtração: ${A} − ${B} = ${D}.`};
+}
+function gMul1(){
+  const a=R(2,9), b=R(2,10);
+  return {q:`${a} × ${b} = ?`,o:opts(a*b,[a*(b+1),a*(b-1),(a+1)*b,(a-1)*b],[a*b+2,a*b-2,a+b,a*b+1,a*b+3,a*b+4],String),
+    why:`${a} × ${b} = ${b} vezes ${a} = ${a*b}.`};
+}
+function gMul2(){
+  const n=R(12,49), d=R(2,5);
+  return {q:`${n} × ${d} = ?`,o:opts(n*d,[n*d+10,n*d-10,n+d],[n*d+d,n*d-d,n*d+20],fmt),
+    why:`${n} × ${d}: ${Math.floor(n/10)*10} × ${d} = ${Math.floor(n/10)*10*d} e ${n%10} × ${d} = ${(n%10)*d}. Somando: ${n*d}.`};
+}
+function gMul3(){
+  const a=R(3,9), b=R(3,9), t=R(0,2);
+  const q=[`Uma caixa tem ${a} lápis. Quantos lápis há em ${b} caixas?`,
+           `Cada pacote tem ${a} bolachas. Quantas bolachas há em ${b} pacotes?`,
+           `Marcos arrumou ${b} fileiras com ${a} cadeiras em cada uma. Quantas cadeiras são ao todo?`][t];
+  return {q:q,o:opts(a*b,[a+b,a*b+a,a*b-a],[a*b+b,a*b-b,a*b+10],String),
+    why:`Grupos iguais pedem multiplicação: ${a} × ${b} = ${a*b}.`};
+}
+function gMul4(){
+  const n=R(3,99), m=pick([10,100]), p=n*m;
+  return {q:`${n} × ${m} = ?`,o:opts(p,[p*10,p/10,m===10?n*100:n*10],[n+m,p*100],fmt),
+    why:`Para multiplicar por ${m}, acrescente ${m===10?'um zero':'dois zeros'}: ${n} × ${m} = ${fmt(p)}.`};
+}
+function gProb(){
+  const t=R(0,3);
+  if(t===0){ const A=R(12,40), B=R(2,4), C=R(5,A*B-10), r=A*B-C, w=pick(['João','Pedro','Lia','Bia']);
+    return {q:`Uma caixa tem ${A} chocolates. ${w} comprou ${B} caixas e comeu ${C} chocolates. Quantos sobraram?`,
+      o:opts(r,[A*B+C,A+B-C,r+10],[r-10,A*B,r+C],String),why:`${A} × ${B} = ${A*B} chocolates. Depois: ${A*B} − ${C} = ${r}.`}; }
+  if(t===1){ const A=R(20,60), B=R(10,40), C=R(10,40), r=A+B+C, w=pick(['Maria','Davi','Ana','Caio']);
+    return {q:`${w} tinha ${A} figurinhas. Ganhou ${B} de um amigo e ${C} de outro. Com quantas ficou?`,
+      o:opts(r,[A+B,r+10,r-10],[r+5,r-5,A+C+B-10],String),why:`${A} + ${B} + ${C} = ${r}.`}; }
+  if(t===2){ let B,P,N; do{ B=R(2,4); P=R(6,15); N=pick([50,100]); }while(B*P>N-5); const r=N-B*P;
+    return {q:`Ana comprou ${B} cadernos de ${brl(P*100)} cada e pagou com uma nota de ${brl(N*100)}. Qual foi o troco?`,
+      o:opts(r*100,[B*P*100,(N-P)*100,(r+10)*100],[(r-5)*100,(r+5)*100,(r+B)*100],brl),why:`${B} × ${P} = ${B*P}. Troco: ${N} − ${B*P} = ${r} reais.`}; }
+  const A=R(30,90), B=R(A+10,A+60), w=pick(['Bia','Caio','Lia','Davi']);
+  return {q:`${w} tem ${brl(A*100)} e quer comprar um brinquedo de ${brl(B*100)}. Quanto falta?`,
+    o:opts((B-A)*100,[(A+B)*100,(B-A+10)*100,(B-A-10)*100],[(B-A+5)*100,(B-A-5)*100],brl),why:`${B} − ${A} = ${B-A} reais.`};
+}
+const DIAS=['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+function gCal(){
+  const t=R(0,2);
+  if(t===0){ const m30=['Abril','Junho','Setembro','Novembro'], m31=['Janeiro','Março','Maio','Julho','Agosto','Outubro','Dezembro'], k=R(0,1);
+    const right=pick(k?m30:m31), wr=shuffle((k?m31:m30).slice()).slice(0,3);
+    return {q:`Qual destes meses tem ${k?30:31} dias?`,o:[right].concat(wr),why:`${right} tem ${k?30:31} dias. Os meses de 30 dias são abril, junho, setembro e novembro.`}; }
+  if(t===1){ const i=R(0,6), N=pick([2,3,4,5,6,8,9,10]), r=(i+N)%7;
+    return {q:`Hoje é ${DIAS[i]}. Que dia da semana será daqui a ${N} dias?`,
+      o:opts(cap(DIAS[r]),[cap(DIAS[(r+1)%7]),cap(DIAS[(r+6)%7])],DIAS.filter((d,x)=>x!==r).map(cap),String),
+      why:`Conte ${N} dias a partir de ${DIAS[i]}: cai ${DIAS[r]}.`}; }
+  const L=[['Quantos meses tem um bimestre?','2',['3','4','6']],['Quantos meses tem um trimestre?','3',['2','4','6']],['Quantos meses tem um semestre?','6',['3','4','12']],
+           ['Quantos dias tem uma quinzena?','15',['10','20','30']],['Quantos anos tem uma década?','10',['100','20','5']],['Quantos anos tem um século?','100',['10','1.000','50']]];
+  const x=pick(L); return {q:x[0],o:[x[1]].concat(x[2]),why:`Bimestre = 2 meses, trimestre = 3 meses, semestre = 6 meses, quinzena = 15 dias, década = 10 anos, século = 100 anos.`};
+}
+const TEMAS=[
+  {h:['Fruta','Quantidade vendida'],n:['Maçã','Banana','Uva','Laranja','Pera','Melancia'],mais:'Qual fruta foi a mais vendida?',menos:'Qual fruta foi a menos vendida?',
+   soma:(a,b)=>`Somando as vendas de ${a} e ${b}, qual é o total?`,dif:(a,b)=>`Quantas unidades a mais foram vendidas de ${a} do que de ${b}?`},
+  {h:['Esporte','Votos'],n:['Futebol','Vôlei','Natação','Basquete','Judô'],mais:'Qual esporte teve mais votos?',menos:'Qual esporte teve menos votos?',
+   soma:(a,b)=>`Somando os votos de ${a} e ${b}, qual é o total?`,dif:(a,b)=>`Quantos votos a mais teve ${a} do que ${b}?`},
+  {h:['Criança','Livros lidos'],n:['Ana','Bruno','Carla','Davi','Eva','Caio'],mais:'Quem leu mais livros?',menos:'Quem leu menos livros?',
+   soma:(a,b)=>`Quantos livros ${a} e ${b} leram juntos?`,dif:(a,b)=>`Quantos livros ${a} leu a mais do que ${b}?`}
+];
+function gTab(){
+  const T=pick(TEMAS), names=shuffle(T.n.slice()).slice(0,4), vals=nums(4,5,50), rows=names.map((x,i)=>[x,vals[i]]);
+  const ctx=table(T.h,rows), t=R(0,3);
+  const mx=vals.indexOf(Math.max.apply(null,vals)), mn=vals.indexOf(Math.min.apply(null,vals));
+  if(t===0) return {ctx:ctx,q:T.mais,o:[names[mx]].concat(names.filter((x,i)=>i!==mx)),why:`O maior número da tabela é ${vals[mx]}, que é de ${names[mx]}.`};
+  if(t===1) return {ctx:ctx,q:T.menos,o:[names[mn]].concat(names.filter((x,i)=>i!==mn)),why:`O menor número da tabela é ${vals[mn]}, que é de ${names[mn]}.`};
+  const i=R(0,3); let j=R(0,3); while(j===i) j=R(0,3);
+  if(t===2){ const s=vals[i]+vals[j]; return {ctx:ctx,q:T.soma(names[i],names[j]),o:opts(s,[Math.abs(vals[i]-vals[j]),s+5,s-5],[s+10,s-10],String),why:`${vals[i]} + ${vals[j]} = ${s}.`}; }
+  const hi=vals[i]>vals[j]?i:j, lo=hi===i?j:i, d=vals[hi]-vals[lo];
+  return {ctx:ctx,q:T.dif(names[hi],names[lo]),o:opts(d,[vals[hi]+vals[lo],d+5,d-5],[d+10,d+1,d-1],String),why:`${vals[hi]} − ${vals[lo]} = ${d}.`};
+}
+const TEMAS_G=[
+  ['Livros lidos no mês',['Ana','Bruno','Carla','Davi','Eva']],
+  ['Frutas preferidas da turma',['Maçã','Uva','Banana','Pera','Manga']],
+  ['Dias de chuva em cada mês',['Jan','Fev','Mar','Abr','Mai']]
+];
+function gGraf(){
+  const T=pick(TEMAS_G), names=shuffle(T[1].slice()).slice(0,4), vals=nums(4,1,10), items=names.map((x,i)=>[x,vals[i]]);
+  const ctx=barChart(T[0],items,10,false), t=R(0,3), mx=vals.indexOf(Math.max.apply(null,vals)), mn=vals.indexOf(Math.min.apply(null,vals));
+  if(t===0) return {ctx:ctx,q:'Qual barra é a mais alta?',o:[names[mx]].concat(names.filter((x,i)=>i!==mx)),why:`A barra mais alta chega a ${vals[mx]}: é a de ${names[mx]}.`};
+  if(t===1) return {ctx:ctx,q:'Qual barra é a mais baixa?',o:[names[mn]].concat(names.filter((x,i)=>i!==mn)),why:`A barra mais baixa chega a ${vals[mn]}: é a de ${names[mn]}.`};
+  if(t===2){ const i=R(0,3); return {ctx:ctx,q:`Qual é o valor da barra de ${names[i]}?`,o:opts(vals[i],[vals[i]+1,vals[i]-1,vals[i]+2],[vals[i]-2,vals[i]+3],String),why:`O topo da barra de ${names[i]} chega na linha do ${vals[i]}.`}; }
+  const s=vals.reduce((a,b)=>a+b,0);
+  return {ctx:ctx,q:'Quanto dá a soma de todas as quatro barras?',o:opts(s,[s+1,s-1,s+2],[s-2,s+4,s-4],String),why:`${vals.join(' + ')} = ${s}.`};
+}
+const PNAME={3:'Triângulo',5:'Pentágono',6:'Hexágono',7:'Heptágono',8:'Octógono'};
+function gPol1(){
+  const n=R(3,8), cor=pick(['#ffd23f','#8ff0b4','#3ee6ff','#ff9ed2']);
+  return {ctx:polySVG(n,cor,110),q:'Quantos lados tem esta figura?',o:opts(n,[n+1,n-1,n+2],[n-2,n+3],String),why:`Conte os cantos cor-de-rosa (vértices): são ${n}, então são ${n} lados.`};
+}
+function gPol2(){
+  const n=pick([3,5,6,7,8]), cor=pick(['#ffd23f','#8ff0b4','#3ee6ff','#ff9ed2']);
+  return {ctx:polySVG(n,cor,110),q:'Como se chama esta figura?',o:opts(PNAME[n],[],Object.keys(PNAME).filter(k=>+k!==n).map(k=>PNAME[k]),String),why:`${n} lados: ${PNAME[n].toLowerCase()}.`};
+}
+function gPlural(){
+  const W=[['flor','flores',['flors','floris','florres']],['luz','luzes',['luzs','luzis','luzres']],['casa','casas',['casaes','cases','casis']],
+    ['animal','animais',['animals','animales','animaises']],['jornal','jornais',['jornals','jornales','jornaises']],['papel','papéis',['papels','papeles','papelis']],
+    ['homem','homens',['homems','homemes','homeis']],['bombom','bombons',['bombomes','bombomis','bombões']],['limão','limões',['limãos','limães','limãoes']],
+    ['coração','corações',['coraçãos','coraçães','coraçãoes']],['mão','mãos',['mões','mães','mãoes']],['irmão','irmãos',['irmões','irmães','irmãoes']],
+    ['pão','pães',['pãos','pões','pãoes']],['cão','cães',['cãos','cões','cãoes']],['mulher','mulheres',['mulhers','mulheris','mulherses']],['jovem','jovens',['jovems','jovemes','joveis']]];
+  const w=pick(W), wr=w[2].filter(x=>x!==w[1]);
+  return {q:`Qual é o plural de <b>${w[0]}</b>?`,o:[w[1]].concat(wr.slice(0,3)),why:`O plural de ${w[0]} é ${w[1]}.`};
+}
+
+/* ---------- perguntas extras (estáticas) ---------- */
+const T_='<div class="story">';
+const EXTRA={
+ vocab:[
+  {q:'Qual palavra é <b>sinônimo</b> de "bonito"?',o:['lindo','feio','alto','sujo'],why:'Bonito e lindo têm significado parecido.'},
+  {q:'Qual é o <b>antônimo</b> de "alto"?',o:['baixo','forte','comprido','gordo'],why:'Alto e baixo são palavras opostas.'},
+  {q:'Na frase "A professora ficou <b>furiosa</b> com a bagunça", a palavra furiosa quer dizer:',o:['muito brava','muito alegre','muito calma','com sono'],why:'Furiosa é a pessoa muito brava, com muita raiva.'},
+  {q:'Qual palavra vem <b>primeiro</b> no dicionário?',o:['abelha','bola','casa','dedo'],why:'No dicionário as palavras ficam em ordem alfabética: A vem antes de B, C e D.'},
+  {q:'Qual é o <b>antônimo</b> de "alegre"?',o:['triste','contente','feliz','animado'],why:'Alegre e triste são opostos. As outras são sinônimos de alegre.'},
+  {q:'Qual palavra é <b>sinônimo</b> de "gigante"?',o:['enorme','minúsculo','leve','fraco'],why:'Gigante e enorme querem dizer algo muito grande.'}
+ ],
+ narr:[
+  {ctx:T_+'Numa noite de chuva, Ana ouviu um barulho na janela. Era um gatinho molhado e com frio. Ana o enxugou com uma toalha e deu leite morno a ele.</div>',q:'Quando a história acontece?',o:['Numa noite de chuva','De manhã cedo','No verão','Na hora do almoço'],why:'O texto começa dizendo: numa noite de chuva.'},
+  {ctx:T_+'Numa noite de chuva, Ana ouviu um barulho na janela. Era um gatinho molhado e com frio. Ana o enxugou com uma toalha e deu leite morno a ele.</div>',q:'O que Ana fez para ajudar o gatinho?',o:['Enxugou e deu leite morno','Chamou os vizinhos','Deixou na rua','Levou ao parque'],why:'Ana enxugou o gatinho e deu leite morno a ele.'},
+  {ctx:T_+'Na fazenda do Seu João, o galo Rico acordou todos os animais antes do sol nascer. A vaca reclamou do barulho, mas logo todos estavam prontos para o trabalho.</div>',q:'Quem acordou os animais?',o:['O galo Rico','Seu João','A vaca','O sol'],why:'Foi o galo Rico quem acordou todos os animais.'},
+  {ctx:T_+'Na fazenda do Seu João, o galo Rico acordou todos os animais antes do sol nascer. A vaca reclamou do barulho, mas logo todos estavam prontos para o trabalho.</div>',q:'Onde a história acontece?',o:['Na fazenda','Na escola','Na praia','Na cidade'],why:'A história começa dizendo: na fazenda do Seu João.'}
+ ],
+ subst:[
+  {q:'Qual destas palavras é um substantivo <b>comum</b>?',o:['cidade','Piauí','Pedro','Brasil'],why:'Cidade serve para qualquer cidade. As outras nomeiam seres específicos.'},
+  {q:'Qual palavra deve ser escrita com letra <b>maiúscula</b>?',o:['Teresina','cidade','rio','cachorro'],why:'Teresina é nome de uma cidade específica, é substantivo próprio.'},
+  {q:'Na frase "O cachorro Rex latiu", o substantivo <b>próprio</b> é:',o:['Rex','cachorro','latiu','O'],why:'Rex é o nome de um cachorro específico.'},
+  {q:'Qual frase tem <b>dois</b> substantivos próprios?',o:['Ana viajou para Fortaleza.','O menino viajou para a praia.','A menina ganhou um livro.','Meu gato dorme no sofá.'],why:'Ana (pessoa) e Fortaleza (cidade) são nomes de seres específicos.'},
+  {q:'Qual destas palavras é substantivo <b>próprio</b>?',o:['Parnaíba','menino','escola','mesa'],why:'Parnaíba é o nome específico de um rio.'}
+ ],
+ plural:[
+  {q:'Qual é o singular de <b>pães</b>?',o:['pão','pãe','pões','pães'],why:'Pães é o plural de pão.'},
+  {q:'Qual é o plural de <b>lápis</b>?',o:['os lápis','os lápises','os lápizes','os lápi'],why:'Palavras terminadas em s, como lápis, ficam iguais no plural. O que muda é o artigo.'},
+  {q:'Qual frase está no <b>plural</b>?',o:['As crianças brincam no parque.','A criança brinca no parque.','O menino come pão.','Ela canta bem.'],why:'As crianças brincam: artigo, nome e verbo estão no plural.'},
+  {q:'Qual é o singular de <b>animais</b>?',o:['animal','animale','animai','animalis'],why:'Palavras que terminam em "is" voltam para "al" no singular: animais → animal.'},
+  {q:'Qual é o plural de <b>papel</b>?',o:['papéis','papels','papeles','papelis'],why:'Termina em el: troca o l por is e acentua: papéis.'}
+ ],
+ pont:[
+  {q:'Qual sinal vai no final de uma <b>pergunta</b>?',o:['Ponto de interrogação ( ? )','Ponto final ( . )','Ponto de exclamação ( ! )','Vírgula ( , )'],why:'Perguntas terminam com ponto de interrogação.'},
+  {q:'Qual frase está pontuada corretamente?',o:['Quantos anos você tem?','Quantos anos você tem!','Quantos anos você tem,','Quantos anos você tem'],why:'É uma pergunta, então termina com ponto de interrogação.'},
+  {q:'O <b>travessão</b> ( — ) é usado para:',o:['indicar a fala de um personagem','terminar uma frase','marcar uma pergunta','separar sílabas'],why:'Nos diálogos, o travessão mostra quando um personagem começa a falar.'},
+  {q:'Qual frase está com as vírgulas corretas?',o:['Comprei maçã, banana, uva e pera.','Comprei, maçã banana uva e pera.','Comprei maçã banana uva e, pera.','Comprei maçã banana uva e pera,'],why:'A vírgula separa os itens de uma lista, menos antes do "e".'},
+  {q:'Qual sinal mostra que a frase continua ou tem suspense? "Será que ele vem__"',o:['Reticências ( ... )','Ponto final ( . )','Vírgula ( , )','Dois-pontos ( : )'],why:'As reticências mostram dúvida, suspense ou que a frase continua.'},
+  {q:'Qual sinal costuma vir antes de uma lista? "Trouxe três frutas__ maçã, pera e uva."',o:['Dois-pontos ( : )','Ponto de interrogação ( ? )','Ponto final ( . )','Reticências ( ... )'],why:'Os dois-pontos aparecem antes de uma lista ou de uma fala.'}
+ ],
+ red:[
+  {q:'Em uma narração, o <b>começo</b> serve para:',o:['apresentar personagens, lugar e tempo','mostrar só o final','resolver o problema','repetir o título'],why:'No começo apresentamos quem, onde e quando.'},
+  {q:'Qual é a ordem certa das partes de uma narração?',o:['Começo, meio e fim','Fim, começo e meio','Meio, fim e começo','Só começo e fim'],why:'A história começa, tem um problema no meio e termina com a solução.'},
+  {q:'Qual frase pode ser o <b>começo</b> de uma história?',o:['Certo dia, um menino encontrou um mapa antigo.','Por fim, todos foram embora.','Obrigado por ler.','Então, tudo acabou bem.'],why:'"Certo dia" é uma boa forma de começar e já apresenta um personagem.'},
+  {q:'Qual palavra ajuda a mostrar a passagem do <b>tempo</b> na história?',o:['Depois','Casa','Azul','Mesa'],why:'Palavras como depois, então e de repente ligam as partes da história.'}
+ ],
+ dec:[
+  {q:'Quantas unidades formam <b>1 dezena</b>?',o:['10','100','1','1.000'],why:'10 unidades = 1 dezena.'},
+  {q:'Quantas dezenas formam <b>1 centena</b>?',o:['10','100','1','5'],why:'10 dezenas = 1 centena (100).'}
+ ],
+ ordcl:[
+  {q:'Em 3.721, qual é o valor do algarismo <b>3</b>?',o:['3.000','300','30','3'],why:'O 3 está na ordem das unidades de milhar: vale 3.000.'},
+  {q:'Cada <b>classe</b> reúne quantas ordens?',o:['3','2','4','5'],why:'As ordens se juntam de três em três: unidades simples e milhares.'}
+ ],
+ leit:[
+  {q:'Como se escreve 100 por extenso?',o:['cem','cento','dez','mil'],why:'100 é "cem". Já 101 é "cento e um".'},
+  {q:'Como se escreve 101 por extenso?',o:['cento e um','cem e um','cento e dez','cem'],why:'De 101 a 199 usamos "cento e ...".'}
+ ],
+ comp:[
+  {q:'Em 5.305, qual ordem vale <b>zero</b>?',o:['dezenas','centenas','unidades','unidades de milhar'],why:'5.305 = 5.000 + 300 + 5. Não aparece dezena.'}
+ ],
+ rom:[
+  {q:'Em que lugares costumamos ver números romanos?',o:['Relógios, capítulos de livros e séculos','Somente em contas de dinheiro','Só em tabelas','Em nenhum lugar'],why:'Os números romanos aparecem em relógios, capítulos e nos séculos.'},
+  {q:'Quanto vale a letra <b>X</b> nos números romanos?',o:['10','5','50','100'],why:'I = 1, V = 5, X = 10, L = 50, C = 100.'}
+ ],
+ cal:[
+  {q:'Quantos dias tem um ano <b>bissexto</b>?',o:['366','365','364','360'],why:'No ano bissexto, fevereiro ganha o dia 29, então tem 366 dias.'},
+  {q:'Quantos dias tem uma semana?',o:['7','5','6','10'],why:'A semana tem 7 dias.'},
+  {q:'Qual é o <b>último</b> mês do ano?',o:['Dezembro','Novembro','Janeiro','Outubro'],why:'O ano termina em dezembro, o 12º mês.'}
+ ],
+ pol:[
+  {q:'Quantos vértices tem um <b>hexágono</b>?',o:['6','5','8','4'],why:'Todo polígono tem o mesmo número de lados e de vértices. Hexágono tem 6.'},
+  {q:'Qual destas figuras é um <b>quadrilátero</b>?',o:['Retângulo','Triângulo','Pentágono','Círculo'],why:'Quadrilátero é a figura de 4 lados. O retângulo tem 4 lados.'},
+  {q:'Qual quadrilátero tem os <b>4 lados iguais e 4 ângulos retos</b>?',o:['Quadrado','Retângulo','Trapézio','Triângulo'],why:'O quadrado tem 4 lados iguais e 4 ângulos retos.'},
+  {q:'Quantos lados tem um <b>octógono</b>?',o:['8','6','7','10'],why:'Octógono: 8 lados.'}
+ ]
+};
+const GEN={
+ dec:[gDec1,gDec2,gDec2], ordcl:[gOrdcl1,gOrdcl2,gOrdcl1], leit:[gLeit1,gLeit2,gLeit1], comp:[gComp1,gComp2,gComp1],
+ antsuc:[gAntSuc1,gAntSuc2,gAntSuc1], parimp:[gParImp1,gParImp2,gParImp1], ordem:[gOrdem1,gOrdem2,gOrdem3,gOrdem1],
+ rom:[gRom1,gRom2,gRom1], din:[gDin1,gDin2,gDin3,gDin4], add:[gAdd1,gAdd2,gAdd1,gAdd2], sub:[gSub1,gSub2,gSub1,gSub2],
+ mul:[gMul1,gMul2,gMul3,gMul4], prob:[gProb,gProb,gProb,gProb], cal:[gCal,gCal], tab:[gTab,gTab,gTab,gTab], graf:[gGraf,gGraf,gGraf,gGraf],
+ pol:[gPol1,gPol2], plural:[gPlural,gPlural]
+};
+const QN=4;           /* perguntas por missão */
+const lastSeen={};    /* só em memória: evita repetir as mesmas perguntas na hora de jogar de novo */
+function poolOf(lesson){ return lesson.quiz.concat(EXTRA[lesson.id]||[]).concat(GEN[lesson.id]||[]); }
+function drawFrom(lesson,k){
+  const pool=poolOf(lesson), prev=lastSeen[lesson.id]||[], out=[], seen=new Set();
+  const fresh=pool.filter(e=>typeof e==='function'||!prev.includes(e));
+  const order=shuffle((fresh.length>=k?fresh:pool).slice());
+  const take=e=>{ const q=typeof e==='function'?e():e, key=q.q+'|'+(q.ctx||''); if(seen.has(key)) return false; seen.add(key); out.push({e:e,q:q}); return true; };
+  order.forEach(e=>{ if(out.length<k) take(e); });
+  let g=0; while(out.length<k&&g++<80) take(pick(pool));
+  return out;
+}
+function makeQs(lesson){
+  const d=drawFrom(lesson,QN);
+  lastSeen[lesson.id]=d.filter(x=>typeof x.e!=='function').map(x=>x.e);
+  return d.map(x=>x.q);
+}
+const toQ=q=>({q:q.q,ctx:q.ctx,why:q.why,opts:shuffle(q.o.map((t,k)=>({t:t,ok:k===0})))});
+
+/* =====================================================================
    ESTADO E ARMAZENAMENTO
    ===================================================================== */
 const KEY='missao-estrelas-v1';
-const DEFAULT={name:'',sound:true,voice:'',pin:'1234',planetsSeen:{},progress:{},opened:{},prizes:[]};
+const DEFAULT={name:'',sound:true,voice:'',pin:'1234',planetsSeen:{},progress:{},opened:{},prizes:[],sim:{best:null,last:null,tries:0,n:20}};
 const BLANK_PRIZE=()=>({emoji:'🎁',title:'',message:'',img:''});
 function migrate(s){
   if(!Array.isArray(s.prizes)) s.prizes=[];
@@ -640,6 +1069,7 @@ function migrate(s){
   if(!s.opened||typeof s.opened!=='object') s.opened={};
   if(s.claimed===true) s.opened[0]=true;
   delete s.claimed;
+  if(!s.sim||typeof s.sim!=='object') s.sim={best:null,last:null,tries:0,n:20};
   return s;
 }
 let memStore=null;
@@ -895,6 +1325,8 @@ function renderMap(scroll){
     <div class="mission"><div class="mtxt"><b>Rumo aos 3 baús</b><span>${doneCount()} de ${TOTAL} missões</span></div>
       <div class="starbar"><div class="track"><i style="width:${(ts/MAXSTARS*100).toFixed(1)}%"></i></div>${TIERS.map((t,k)=>`<button class="mchest ${chestState(k)}" style="left:${((k+1)/3*100).toFixed(2)}%" data-k="${k}" aria-label="${t.name}">${chestSVG(chestState(k)==='opened'?'open':'',k)}</button>`).join('')}</div>
       <div class="mnext">${nx?`Próximo: ${TIERS[nx.k].name} · faltam ${nx.left} ⭐`:'Você destravou todos os baús!'}</div></div>`;
+  const sm=S.sim||{};
+  h+=`<button class="simcard" id="b-sim"><span class="se">📝</span><span class="st"><b>Simulado da prova</b><small>${sm.tries?`Melhor: ${sm.best} de ${sm.n||20} · feito ${sm.tries} ${sm.tries>1?'vezes':'vez'}`:'20 questões, como na prova. Não vale estrelas.'}</small></span><span class="sg">➜</span></button>`;
   const offs=[0,56,84,56,0,-56,-84,-56];
   PLANETS.forEach((p,pi)=>{
     const ls=LESSONS.filter(l=>l.planet===pi), pd=ls.filter(l=>doneOf(l.id)).length;
@@ -916,6 +1348,7 @@ function renderMap(scroll){
   root.innerHTML=h;
   $('#b-snd').onclick=()=>{ S.sound=!S.sound; save(); Snd.init(); Snd.play('click'); renderMap(false); };
   $('#b-adm').onclick=()=>{ Snd.init(); askPin(); };
+  $('#b-sim').onclick=()=>{ Snd.init(); Snd.play('next'); startSimulado(); };
   $$('.nbtn[data-i]',root).forEach(b=>b.onclick=()=>{
     Snd.init(); const i=+b.dataset.i;
     if(!unlocked(i)){ Snd.play('lock'); b.parentNode.style.animation='shake .4s'; setTimeout(()=>b.parentNode.style.animation='',450); return; }
@@ -938,7 +1371,7 @@ const RETRY=['Quase! Tente outra opção.','Ainda não. Leia com calma e tente d
 function startLesson(i){
   const lesson=LESSONS[i];
   L={i:i,lesson:lesson,step:0,q:0,firstOK:0,tried:false,answered:false,
-     qs:lesson.quiz.map(q=>({q:q.q,ctx:q.ctx,why:q.why,opts:shuffle(q.o.map((t,k)=>({t:t,ok:k===0})))}))};
+     qs:makeQs(lesson).map(toQ)};
   renderLesson(); show('s-lesson');
 }
 function segs(){
@@ -984,7 +1417,7 @@ function answer(btn,k){
   }
 }
 function finishLesson(){
-  const lesson=L.lesson, stars=Math.max(1,L.firstOK), prev=starsOf(lesson.id), firstOK=L.firstOK, qn=L.qs.length;
+  const lesson=L.lesson, stars=(L.firstOK>=L.qs.length?3:(L.firstOK>=L.qs.length-1?2:1)), prev=starsOf(lesson.id), firstOK=L.firstOK, qn=L.qs.length;
   const before=totalStars();
   S.progress[lesson.id]={done:true,stars:Math.max(prev,stars)}; save();
   const after=totalStars();
@@ -1015,6 +1448,69 @@ function finishLesson(){
     else { renderMap(); show('s-map'); }
   }
 }
+/* =====================================================================
+   SIMULADO: 20 questões, uma tentativa por pergunta, não vale estrelas
+   ===================================================================== */
+let SIM=null;
+function simPick(){
+  const pt=LESSONS.filter(l=>l.planet===0), ma=LESSONS.filter(l=>l.planet!==0);
+  const chosen=pt.concat(shuffle(pt.slice()).slice(0,2)).concat(shuffle(ma.slice()).slice(0,12));
+  chosen.sort((a,b)=>LESSONS.indexOf(a)-LESSONS.indexOf(b));
+  const seen=new Set(), out=[];
+  chosen.forEach(l=>{
+    for(let t=0;t<12;t++){
+      const e=pick(poolOf(l)), q=typeof e==='function'?e():e, key=q.q+'|'+(q.ctx||'');
+      if(!seen.has(key)){ seen.add(key); out.push(Object.assign({},q,{lesson:l.title})); break; }
+    }
+  });
+  return out;
+}
+function startSimulado(){
+  const qs=simPick().map(q=>Object.assign(toQ(q),{lesson:q.lesson}));
+  SIM={qs:qs,q:0,res:[],answered:false};
+  renderSim(); show('s-lesson');
+}
+function renderSim(){
+  const root=$('#s-lesson'), q=SIM.qs[SIM.q], n=SIM.qs.length; SIM.answered=false;
+  let sg=''; for(let k=0;k<n;k++) sg+=`<i class="${k<SIM.q?'on':(k===SIM.q?'cur':'')}"></i>`;
+  root.innerHTML=`<div class="lhead"><button class="icon-btn" id="l-x" aria-label="Sair">✕</button><div class="segs">${sg}</div><button class="icon-btn" id="l-say" aria-label="Ler em voz alta">🔊</button></div>
+    <div class="card" id="l-card"><div class="qtag">📝 Simulado · pergunta ${SIM.q+1} de ${n}</div>${q.ctx?`<div class="qctx">${q.ctx}</div>`:''}<h2 class="q">${q.q}</h2>
+    <div id="opts">${q.opts.map((o,k)=>`<button class="opt" data-k="${k}"><span class="l">${'ABCD'[k]}</span><span class="t">${o.t}</span></button>`).join('')}</div><div id="qfb"></div></div>
+    <div class="lfoot" id="qfoot"></div>`;
+  $$('.opt',root).forEach(b=>b.onclick=()=>answerSim(b,+b.dataset.k));
+  $('#l-say').onclick=()=>{ Snd.init(); speak(q.q.replace(/<[^>]+>/g,'')+'. '+q.opts.map((o,k)=>'Opção '+'ABCD'[k]+': '+o.t.replace(/<[^>]+>/g,'')).join('. ')); };
+  $('#l-x').onclick=()=>{ Snd.play('click'); confirmBox('Sair do simulado?','O simulado não será salvo. Quer mesmo sair?','Sair',()=>{ renderMap(false); show('s-map'); },true); };
+}
+function answerSim(btn,k){
+  if(SIM.answered) return; SIM.answered=true;
+  const q=SIM.qs[SIM.q], ok=q.opts[k].ok, right=q.opts.find(o=>o.ok).t, last=SIM.q===SIM.qs.length-1;
+  $$('.opt').forEach((b,i)=>{ b.disabled=true; if(q.opts[i].ok) b.classList.add('ok'); });
+  if(ok){ Snd.play('correct'); fx.at(btn,22,{speed:6}); } else { btn.classList.add('bad'); Snd.play('wrong'); }
+  SIM.res.push({q:q.q,ctx:q.ctx,right:right,chosen:q.opts[k].t,ok:ok,why:q.why,lesson:q.lesson});
+  $('#qfb').innerHTML=ok?`<div class="fb ok"><span class="tico">🤖</span><div><b>${pick(PRAISE)}</b> ${q.why}</div></div>`
+    :`<div class="fb no"><span class="tico">🤖</span><div><b>Não foi dessa vez.</b> A resposta certa é: ${right}. ${q.why}</div></div>`;
+  $('#qfoot').innerHTML=`<button class="btn green" id="q-next">${last?'Ver meu resultado ⭐':'Próxima pergunta ➜'}</button>`;
+  $('#q-next').onclick=()=>{ Snd.play('next'); if(last) finishSim(); else { SIM.q++; renderSim(); window.scrollTo(0,0); } };
+  setTimeout(()=>{ const f=$('#qfoot'); if(f) f.scrollIntoView({block:'end',behavior:'smooth'}); },250);
+}
+function finishSim(){
+  const n=SIM.qs.length, sc=SIM.res.filter(r=>r.ok).length, wrong=SIM.res.filter(r=>!r.ok);
+  S.sim={best:Math.max((S.sim&&S.sim.best)||0,sc),last:sc,tries:((S.sim&&S.sim.tries)||0)+1,n:n}; save();
+  const msg=sc>=n*0.9?'Incrível! Você está pronto para a prova!':sc>=n*0.7?'Muito bom! Veja os erros abaixo e vai ficar ainda melhor.':sc>=n*0.5?'Bom começo! Leia os erros abaixo e faça outro simulado.':'Vamos treinar mais! Releia as missões e tente de novo.';
+  const root=$('#s-result');
+  root.innerHTML=`<div class="res"><div class="rt">Simulado concluído!</div><div class="rs">Treino para a prova</div>
+    <div class="simscore"><b>${sc}</b><span>de ${n}</span></div>
+    <div class="rm">${msg}</div><div class="rc">Seu melhor resultado: ${S.sim.best} de ${n}. O simulado não conta estrelas.</div>
+    <button class="btn green block" id="r-go">Voltar ao mapa ➜</button>
+    <button class="btn ghost block" id="r-again">Fazer outro simulado</button>
+    ${wrong.length?`<h3 class="simh">Para revisar (${wrong.length})</h3>`+wrong.map(r=>`<div class="card mist"><div class="sml">${esc(r.lesson)}</div>${r.ctx?`<div class="qctx">${r.ctx}</div>`:''}<div class="smq">${r.q}</div>
+      <div class="smx">Você marcou: ${r.chosen}</div><div class="smo">Certa: ${r.right}</div><div class="smw">${r.why}</div></div>`).join(''):'<div class="rchest up">Você acertou tudo! 🎉</div>'}</div>`;
+  show('s-result');
+  Snd.play('complete'); if(sc>=n*0.9){ Snd.play('final'); fx.rain(2800); } else fx.burst(innerWidth/2,innerHeight*.3,40,{speed:9});
+  $('#r-go').onclick=()=>{ Snd.play('next'); renderMap(false); show('s-map'); };
+  $('#r-again').onclick=()=>{ Snd.play('next'); startSimulado(); };
+}
+
 function showMedal(planet,cb){
   const m=openModal(`<div class="big">${planet.medal}</div><h3>${planet.name} conquistado!</h3><p>Você completou todas as missões deste planeta. Continue a viagem rumo ao tesouro!</p><button class="btn block" id="md-ok">Seguir viagem 🚀</button>`,'medal');
   Snd.play('planet'); fx.rain(3500); fx.burst(innerWidth/2,innerHeight*.4,50,{speed:10});
@@ -1135,7 +1631,7 @@ function openAdmin(){
       <div class="btns"><button class="btn green sm" id="a-save">Salvar prêmios</button><button class="btn sm ghost" id="a-test" style="color:#2a2f8f;background:#eef0ff;box-shadow:none">Ver este baú como a criança verá</button></div>
     </div>
     <div class="sec"><h4>👦 Criança</h4><label for="a-name">Nome</label><input type="text" id="a-name" maxlength="20" value="${esc(S.name)}"><div class="btns"><button class="btn sm" id="a-sname">Salvar nome</button></div></div>
-    <div class="sec"><h4>📈 Progresso</h4><p class="hint">${doneCount()} de ${TOTAL} missões · ${totalStars()} de ${MAXSTARS} estrelas<br>${[0,1,2].map(stl).join('<br>')}</p><table>${rows}</table>
+    <div class="sec"><h4>📈 Progresso</h4><p class="hint">${doneCount()} de ${TOTAL} missões · ${totalStars()} de ${MAXSTARS} estrelas<br>${S.sim&&S.sim.tries?`Simulado: melhor ${S.sim.best}/${S.sim.n||20} · último ${S.sim.last}/${S.sim.n||20} · ${S.sim.tries} tentativa(s)<br>`:''}${[0,1,2].map(stl).join('<br>')}</p><table>${rows}</table>
       <div class="btns"><button class="btn sm red" id="a-reset">Zerar progresso</button></div></div>
     <div class="sec"><h4>🔊 Voz da leitura</h4><p class="hint">É a voz do próprio aparelho. Se uma voz soar robótica, teste as outras da lista. As que têm Google, Natural ou Neural costumam ser melhores.</p>
       <label for="a-voice">Voz</label><select id="a-voice" style="width:100%;font:inherit;font-size:18px;padding:10px;border-radius:14px;border:3px solid #d9ddff;color:#1c2150;background:#fff"><option value="">Automática (a melhor encontrada)</option>${VOICES.map(v=>`<option value="${esc(v.name)}" ${v.name===S.voice?'selected':''}>${esc(v.name)} (${esc(v.lang)})</option>`).join('')}</select>
@@ -1165,7 +1661,7 @@ function openAdmin(){
   $('#a-save',m).onclick=function(){ savePrizes(); Snd.play('correct'); flash(this,'Salvo! ✓'); };
   $('#a-test',m).onclick=()=>{ savePrizes(); const p=S.prizes[cur]; if(!p.title&&!p.img){ alert('Escreva o que está dentro deste baú para testar.'); return; } closeModal(); openChestScreen(cur,{preview:true}); };
   $('#a-sname',m).onclick=function(){ S.name=$('#a-name',m).value.trim()||'Astronauta'; save(); flash(this,'Salvo! ✓'); };
-  $('#a-reset',m).onclick=()=>confirmBox('Zerar o progresso?','Todas as estrelas, missões e baús abertos serão apagados. Os prêmios cadastrados continuam guardados.','Zerar',()=>{ S.progress={}; S.planetsSeen={}; S.opened={}; save(); closeModal(); renderMap(); show('s-map'); },true);
+  $('#a-reset',m).onclick=()=>confirmBox('Zerar o progresso?','Todas as estrelas, missões e baús abertos serão apagados. Os prêmios cadastrados continuam guardados.','Zerar',()=>{ S.progress={}; S.planetsSeen={}; S.opened={}; S.sim={best:null,last:null,tries:0,n:20}; save(); closeModal(); renderMap(); show('s-map'); },true);
   $('#a-exp',m).onclick=()=>{ const b=new Blob([JSON.stringify(S)],{type:'application/json'}), a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='missao-estrelas-backup.json'; document.body.appendChild(a); a.click(); a.remove(); };
   $('#a-imp',m).onchange=e=>{ const f=e.target.files[0]; if(!f) return; const fr=new FileReader(); fr.onload=()=>{ try{ const d=JSON.parse(fr.result); if(!d||typeof d!=='object'||!d.progress) throw 0; S=migrate(Object.assign(JSON.parse(JSON.stringify(DEFAULT)),d)); save(); closeModal(); renderMap(); show('s-map'); }catch(err){ alert('Esse arquivo não parece ser um backup do aplicativo.'); } }; fr.readAsText(f); };
   $('#a-voice',m).onchange=e=>{ S.voice=e.target.value; save(); };
