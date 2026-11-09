@@ -1059,7 +1059,7 @@ const toQ=q=>({q:q.q,ctx:q.ctx,why:q.why,opts:shuffle(q.o.map((t,k)=>({t:t,ok:k=
    ESTADO E ARMAZENAMENTO
    ===================================================================== */
 const KEY='missao-estrelas-v1';
-const DEFAULT={name:'',sound:true,voice:'',pin:'1234',planetsSeen:{},progress:{},opened:{},prizes:[],sim:{best:null,last:null,tries:0,n:20}};
+const DEFAULT={name:'',sound:true,voice:'',pin:'1234',planetsSeen:{},progress:{},opened:{},prizes:[],sim:{best:null,last:null,tries:0,n:20},hist:{}};
 const BLANK_PRIZE=()=>({emoji:'🎁',title:'',message:'',img:''});
 function migrate(s){
   if(!Array.isArray(s.prizes)) s.prizes=[];
@@ -1070,6 +1070,7 @@ function migrate(s){
   if(!s.opened||typeof s.opened!=='object') s.opened={};
   if(s.claimed===true) s.opened[0]=true;
   delete s.claimed;
+  if(!s.hist||typeof s.hist!=='object'||Array.isArray(s.hist)) s.hist={};
   if(!s.sim||typeof s.sim!=='object') s.sim={best:null,last:null,tries:0,n:20};
   return s;
 }
@@ -1413,7 +1414,7 @@ function answer(btn,k){
     $('#q-next').onclick=()=>{ Snd.play('next'); if(lastQ) finishLesson(); else { L.step++; renderLesson(); window.scrollTo(0,0); } };
     setTimeout(()=>{ const f=$('#qfoot'); if(f) f.scrollIntoView({block:'end',behavior:'smooth'}); },250);
   } else {
-    L.tried=true; btn.classList.add('bad'); btn.disabled=true; Snd.play('wrong');
+    L.tried=true; btn.classList.add('bad'); btn.disabled=true; Snd.play('wrong'); logWrong(q,L.lesson.title);
     $('#qfb').innerHTML=`<div class="fb no"><span class="tico">🤖</span><div>${pick(RETRY)}</div></div>`;
   }
 }
@@ -1452,6 +1453,15 @@ function finishLesson(){
 /* =====================================================================
    SIMULADO: 20 questões, uma tentativa por pergunta, não vale estrelas
    ===================================================================== */
+const plain=t=>String(t||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+function logWrong(q,lessonTitle){
+  const right=(q.opts.find(o=>o.ok)||{}).t, key=lessonTitle+'|'+plain(q.q)+'|'+plain(q.ctx).slice(0,40);
+  const e=S.hist[key]||(S.hist[key]={q:plain(q.q),c:plain(q.ctx).slice(0,80),l:lessonTitle,w:0,r:plain(right),d:0});
+  e.w++; e.d=Date.now(); e.r=plain(right);
+  const ks=Object.keys(S.hist);
+  if(ks.length>300){ ks.sort((a,b)=>(S.hist[a].w-S.hist[b].w)||(S.hist[a].d-S.hist[b].d)); ks.slice(0,ks.length-300).forEach(k=>delete S.hist[k]); }
+  save();
+}
 let SIM=null;
 function simPick(){
   const pt=LESSONS.filter(l=>l.planet===0), ma=LESSONS.filter(l=>l.planet!==0);
@@ -1486,7 +1496,7 @@ function answerSim(btn,k){
   if(SIM.answered) return; SIM.answered=true;
   const q=SIM.qs[SIM.q], ok=q.opts[k].ok, right=q.opts.find(o=>o.ok).t, last=SIM.q===SIM.qs.length-1;
   $$('.opt').forEach((b,i)=>{ b.disabled=true; if(q.opts[i].ok) b.classList.add('ok'); });
-  if(ok){ Snd.play('correct'); fx.at(btn,22,{speed:6}); } else { btn.classList.add('bad'); Snd.play('wrong'); }
+  if(ok){ Snd.play('correct'); fx.at(btn,22,{speed:6}); } else { btn.classList.add('bad'); Snd.play('wrong'); logWrong(q,q.lesson); }
   SIM.res.push({q:q.q,ctx:q.ctx,right:right,chosen:q.opts[k].t,ok:ok,why:q.why,lesson:q.lesson});
   $('#qfb').innerHTML=ok?`<div class="fb ok"><span class="tico">🤖</span><div><b>${pick(PRAISE)}</b> ${q.why}</div></div>`
     :`<div class="fb no"><span class="tico">🤖</span><div><b>Não foi dessa vez.</b> A resposta certa é: ${right}. ${q.why}</div></div>`;
@@ -1617,6 +1627,14 @@ function readImage(file,cb){
     cb(c.toDataURL('image/jpeg',.82)); }; img.src=fr.result; };
   fr.readAsDataURL(file);
 }
+function histHTML(){
+  const L=Object.keys(S.hist).map(k=>S.hist[k]).sort((a,b)=>(b.w-a.w)||(b.d-a.d));
+  if(!L.length) return '<p class="hint">Ainda não há erros anotados. A partir desta versão, cada resposta errada fica registrada aqui.</p>';
+  const tot=L.reduce((a,e)=>a+e.w,0), by={};
+  L.forEach(e=>by[e.l]=(by[e.l]||0)+e.w);
+  const top=Object.keys(by).sort((a,b)=>by[b]-by[a]).slice(0,5).map(t=>esc(t)+' ('+by[t]+')').join(', ');
+  return `<p class="hint">${tot} erro(s) em ${L.length} questão(ões). Mais erros em: ${top}.</p>${L.slice(0,40).map(e=>`<div style="text-align:left;padding:8px 0;border-top:1px solid #e3e6ff;font-size:15px;line-height:1.35;color:#1c2150"><b>${e.w}× errada</b> · <span style="color:#5a6090">${esc(e.l)}</span><br>${esc(e.q)}${e.c?' <i>('+esc(e.c)+'…)</i>':''}<br><b style="color:#0d5a2e">Certa: ${esc(e.r)}</b></div>`).join('')}${L.length>40?'<p class="hint">Mostrando as 40 com mais erros.</p>':''}<div class="btns"><button class="btn sm red" id="a-hclear">Limpar histórico</button></div>`;
+}
 const ICONS={'svg:trike':`<svg viewBox="0 0 64 64" width="1em" height="1em" aria-label="Triciclo"><g fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="46" r="9" fill="#3ee6ff" stroke="#1c2150" stroke-width="4"/><circle cx="14" cy="46" r="3" fill="#1c2150"/><circle cx="48" cy="52" r="5" fill="#ff5ea8" stroke="#1c2150" stroke-width="3"/><circle cx="58" cy="52" r="4" fill="#ff5ea8" stroke="#1c2150" stroke-width="3"/><path d="M14 46 L20 18 M12 16 L28 14" stroke="#1c2150" stroke-width="4"/><path d="M20 18 L30 34 L50 34 M30 34 L24 46 L46 50" stroke="#1c2150" stroke-width="4"/><path d="M38 34 L40 22 L54 22 L52 36 Z" fill="#ffd23f" stroke="#1c2150" stroke-width="3"/></g></svg>`,'svg:hama':`<svg viewBox="0 0 64 64" width="1em" height="1em" aria-label="Hama beads"><rect x="6" y="6" width="52" height="52" rx="8" fill="#eef0ff" stroke="#1c2150" stroke-width="3"/><g stroke="#1c2150" stroke-width="1.5"><circle cx="18" cy="18" r="5" fill="#ff5ea8"/><circle cx="32" cy="18" r="5" fill="#ffd23f"/><circle cx="46" cy="18" r="5" fill="#ff5ea8"/><circle cx="18" cy="32" r="5" fill="#3ee6ff"/><circle cx="32" cy="32" r="5" fill="#ff5ea8"/><circle cx="46" cy="32" r="5" fill="#3ee6ff"/><circle cx="18" cy="46" r="5" fill="#ff5ea8"/><circle cx="32" cy="46" r="5" fill="#3ddc84"/><circle cx="46" cy="46" r="5" fill="#ffd23f"/></g><g fill="#fff"><circle cx="18" cy="18" r="1.6"/><circle cx="32" cy="18" r="1.6"/><circle cx="46" cy="18" r="1.6"/><circle cx="18" cy="32" r="1.6"/><circle cx="32" cy="32" r="1.6"/><circle cx="46" cy="32" r="1.6"/><circle cx="18" cy="46" r="1.6"/><circle cx="32" cy="46" r="1.6"/><circle cx="46" cy="46" r="1.6"/></g></svg>`};
 const iconHTML=e=>ICONS[e]||esc(e||'🎁');
 const EMOJIS=['svg:trike','svg:hama','🎁','🍦','🍕','🎮','⚽','🚲','🎬','🏊','🧸','📚','🎢','🍫','🦖','🚀','🏆','🎨','🛹','🐶','🎂','🏖️'];
@@ -1636,6 +1654,7 @@ function openAdmin(){
     <div class="sec"><h4>👦 Criança</h4><label for="a-name">Nome</label><input type="text" id="a-name" maxlength="20" value="${esc(S.name)}"><div class="btns"><button class="btn sm" id="a-sname">Salvar nome</button></div></div>
     <div class="sec"><h4>📈 Progresso</h4><p class="hint">${doneCount()} de ${TOTAL} missões · ${totalStars()} de ${MAXSTARS} estrelas<br>${S.sim&&S.sim.tries?`Simulado: melhor ${S.sim.best}/${S.sim.n||20} · último ${S.sim.last}/${S.sim.n||20} · ${S.sim.tries} tentativa(s)<br>`:''}${[0,1,2].map(stl).join('<br>')}</p><table>${rows}</table>
       <div class="btns"><button class="btn sm red" id="a-reset">Zerar progresso</button></div></div>
+    <div class="sec"><h4>🧾 Questões erradas</h4>${histHTML()}</div>
     <div class="sec"><h4>🔊 Voz da leitura</h4><p class="hint">É a voz do próprio aparelho. Se uma voz soar robótica, teste as outras da lista. As que têm Google, Natural ou Neural costumam ser melhores.</p>
       <label for="a-voice">Voz</label><select id="a-voice" style="width:100%;font:inherit;font-size:18px;padding:10px;border-radius:14px;border:3px solid #d9ddff;color:#1c2150;background:#fff"><option value="">Automática (a melhor encontrada)</option>${VOICES.map(v=>`<option value="${esc(v.name)}" ${v.name===S.voice?'selected':''}>${esc(v.name)} (${esc(v.lang)})</option>`).join('')}</select>
       ${VOICES.length?'':'<p class="hint">Este aparelho não informou vozes em português. Instale uma voz em Configurações → Idioma → Saída de texto para voz.</p>'}
@@ -1664,6 +1683,7 @@ function openAdmin(){
   $('#a-save',m).onclick=function(){ savePrizes(); Snd.play('correct'); flash(this,'Salvo! ✓'); };
   $('#a-test',m).onclick=()=>{ savePrizes(); const p=S.prizes[cur]; if(!p.title&&!p.img){ alert('Escreva o que está dentro deste baú para testar.'); return; } closeModal(); openChestScreen(cur,{preview:true}); };
   $('#a-sname',m).onclick=function(){ S.name=$('#a-name',m).value.trim()||'Astronauta'; save(); flash(this,'Salvo! ✓'); };
+  const hc=$('#a-hclear',m); if(hc) hc.onclick=()=>confirmBox('Limpar o histórico de erros?','As questões erradas anotadas serão apagadas. Estrelas e missões não mudam.','Limpar',()=>{ S.hist={}; save(); closeModal(); openAdmin(); },true);
   $('#a-reset',m).onclick=()=>confirmBox('Zerar o progresso?','Todas as estrelas, missões e baús abertos serão apagados. Os prêmios cadastrados continuam guardados.','Zerar',()=>{ S.progress={}; S.planetsSeen={}; S.opened={}; S.sim={best:null,last:null,tries:0,n:20}; save(); closeModal(); renderMap(); show('s-map'); },true);
   $('#a-exp',m).onclick=()=>{ const b=new Blob([JSON.stringify(S)],{type:'application/json'}), a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='missao-estelar-backup.json'; document.body.appendChild(a); a.click(); a.remove(); };
   $('#a-imp',m).onchange=e=>{ const f=e.target.files[0]; if(!f) return; const fr=new FileReader(); fr.onload=()=>{ try{ const d=JSON.parse(fr.result); if(!d||typeof d!=='object'||!d.progress) throw 0; S=migrate(Object.assign(JSON.parse(JSON.stringify(DEFAULT)),d)); save(); closeModal(); renderMap(); show('s-map'); }catch(err){ alert('Esse arquivo não parece ser um backup do aplicativo.'); } }; fr.readAsText(f); };
