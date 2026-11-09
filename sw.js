@@ -1,6 +1,6 @@
 /* Service worker da Missão Estrelas.
    Para publicar uma versão nova, aumente o número em VERSION. */
-const VERSION = 'v4';
+const VERSION = 'v5';
 const CACHE = 'missao-estrelas-' + VERSION;
 const SHELL = [
   './',
@@ -13,7 +13,7 @@ const SHELL = [
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', event => {
@@ -32,7 +32,7 @@ self.addEventListener('fetch', event => {
   // Páginas: tenta a rede primeiro (pega atualizações) e cai no cache se estiver sem internet.
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req).then(res => {
+      fetch(req, { cache: 'no-cache' }).then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put('./index.html', copy));
         return res;

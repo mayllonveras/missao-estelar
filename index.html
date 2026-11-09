@@ -1181,7 +1181,7 @@ if(S.name){ renderMap(); show('s-map'); } else { renderWelcome(); }
 
 /* PWA: registra o service worker (só funciona em http/https) */
 if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
-  window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{}); });
 }
 })();
 </script>
