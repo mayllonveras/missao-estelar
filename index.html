@@ -6,12 +6,12 @@
 <meta name="theme-color" content="#0a0f3c">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Missão Estrelas">
+<meta name="apple-mobile-web-app-title" content="Missão Estelar">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="description" content="Estudo gamificado para o teste do 4º ano do ensino fundamental.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<title>Missão Estrelas – 4º ano</title>
+<title>Missão Estelar – 4º ano</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🚀%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1064,6 +1064,7 @@ const BLANK_PRIZE=()=>({emoji:'🎁',title:'',message:'',img:''});
 function migrate(s){
   if(!Array.isArray(s.prizes)) s.prizes=[];
   for(let i=0;i<3;i++) s.prizes[i]=Object.assign(BLANK_PRIZE(), s.prizes[i]||{});
+  [[1,'svg:trike'],[2,'svg:hama']].forEach(x=>{ const q=s.prizes[x[0]]; if(!q.title&&!q.img&&q.emoji==='🎁') q.emoji=x[1]; });
   if(s.prize && (s.prize.title||s.prize.img) && !s.prizes[0].title && !s.prizes[0].img) s.prizes[0]=Object.assign(BLANK_PRIZE(), s.prize);
   delete s.prize;
   if(!s.opened||typeof s.opened!=='object') s.opened={};
@@ -1291,7 +1292,7 @@ function confirmBox(title, text, okLabel, cb, danger){
 function renderWelcome(){
   $('#s-welcome').innerHTML=`<div class="welcome">
     <div class="logo">🚀</div>
-    <h1>Missão Estrelas</h1>
+    <h1>Missão Estelar</h1>
     <p>Prepare-se para o teste do 4º ano! Você vai viajar por ${PLANETS.length} planetas, cumprir ${TOTAL} missões e ganhar estrelas pelo caminho.</p>
     <p>Pelo caminho você ganha estrelas e destrava <b style="color:#ffd23f">3 baús</b>. Cada um esconde um prêmio surpresa!</p>
     <input id="w-name" type="text" maxlength="20" placeholder="Qual é o seu nome, astronauta?" autocomplete="off" value="${esc(S.name)}">
@@ -1523,7 +1524,7 @@ function showMedal(planet,cb){
 let chestBusy=false, chestQueue=[];
 function prizeCard(k){
   const p=S.prizes[k];
-  const pic = p.img ? `<img src="${p.img}" alt="Prêmio">` : `<div class="pe">${esc(p.emoji||'🎁')}</div>`;
+  const pic = p.img ? `<img src="${p.img}" alt="Prêmio">` : `<div class="pe">${iconHTML(p.emoji)}</div>`;
   return `<div class="prize"><div class="card">${pic}<div class="ltag">Você ganhou:</div><h3>${esc(p.title)}</h3>${p.message?`<div class="pm">${esc(p.message)}</div>`:''}</div></div>`;
 }
 function openChestScreen(k,opts){
@@ -1616,7 +1617,9 @@ function readImage(file,cb){
     cb(c.toDataURL('image/jpeg',.82)); }; img.src=fr.result; };
   fr.readAsDataURL(file);
 }
-const EMOJIS=['🎁','🍦','🍕','🎮','⚽','🚲','🎬','🏊','🧸','📚','🎢','🍫','🦖','🚀','🏆','🎨','🛹','🐶','🎂','🏖️'];
+const ICONS={'svg:trike':`<svg viewBox="0 0 64 64" width="1em" height="1em" aria-label="Triciclo"><g fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="14" cy="46" r="9" fill="#3ee6ff" stroke="#1c2150" stroke-width="4"/><circle cx="14" cy="46" r="3" fill="#1c2150"/><circle cx="48" cy="52" r="5" fill="#ff5ea8" stroke="#1c2150" stroke-width="3"/><circle cx="58" cy="52" r="4" fill="#ff5ea8" stroke="#1c2150" stroke-width="3"/><path d="M14 46 L20 18 M12 16 L28 14" stroke="#1c2150" stroke-width="4"/><path d="M20 18 L30 34 L50 34 M30 34 L24 46 L46 50" stroke="#1c2150" stroke-width="4"/><path d="M38 34 L40 22 L54 22 L52 36 Z" fill="#ffd23f" stroke="#1c2150" stroke-width="3"/></g></svg>`,'svg:hama':`<svg viewBox="0 0 64 64" width="1em" height="1em" aria-label="Hama beads"><rect x="6" y="6" width="52" height="52" rx="8" fill="#eef0ff" stroke="#1c2150" stroke-width="3"/><g stroke="#1c2150" stroke-width="1.5"><circle cx="18" cy="18" r="5" fill="#ff5ea8"/><circle cx="32" cy="18" r="5" fill="#ffd23f"/><circle cx="46" cy="18" r="5" fill="#ff5ea8"/><circle cx="18" cy="32" r="5" fill="#3ee6ff"/><circle cx="32" cy="32" r="5" fill="#ff5ea8"/><circle cx="46" cy="32" r="5" fill="#3ee6ff"/><circle cx="18" cy="46" r="5" fill="#ff5ea8"/><circle cx="32" cy="46" r="5" fill="#3ddc84"/><circle cx="46" cy="46" r="5" fill="#ffd23f"/></g><g fill="#fff"><circle cx="18" cy="18" r="1.6"/><circle cx="32" cy="18" r="1.6"/><circle cx="46" cy="18" r="1.6"/><circle cx="18" cy="32" r="1.6"/><circle cx="32" cy="32" r="1.6"/><circle cx="46" cy="32" r="1.6"/><circle cx="18" cy="46" r="1.6"/><circle cx="32" cy="46" r="1.6"/><circle cx="46" cy="46" r="1.6"/></g></svg>`};
+const iconHTML=e=>ICONS[e]||esc(e||'🎁');
+const EMOJIS=['svg:trike','svg:hama','🎁','🍦','🍕','🎮','⚽','🚲','🎬','🏊','🧸','📚','🎢','🍫','🦖','🚀','🏆','🎨','🛹','🐶','🎂','🏖️'];
 function openAdmin(){
   const drafts=S.prizes.map(p=>Object.assign({},p));
   let cur=0;
@@ -1647,7 +1650,7 @@ function openAdmin(){
     const d=drafts[cur], t=TIERS[cur];
     $('#a-prize',m).innerHTML=`<label for="a-title">O que está dentro do ${t.name}?</label><input type="text" id="a-title" maxlength="80" placeholder="Ex.: Um passeio no parque de diversões" value="${esc(d.title)}">
       <label for="a-msg">Mensagem para ele (opcional)</label><textarea id="a-msg" maxlength="400" placeholder="Ex.: Parabéns pelo esforço! Combinamos o dia juntos.">${esc(d.message)}</textarea>
-      <label>Ícone do prêmio</label><div class="emojis" id="a-emo">${EMOJIS.map(e=>`<button type="button" data-e="${e}" class="${e===d.emoji?'sel':''}">${e}</button>`).join('')}</div>
+      <label>Ícone do prêmio</label><div class="emojis" id="a-emo">${EMOJIS.map(e=>`<button type="button" data-e="${e}" class="${e===d.emoji?'sel':''}">${iconHTML(e)}</button>`).join('')}</div>
       <label for="a-img">Foto do prêmio (opcional, aparece no lugar do ícone)</label><input type="file" id="a-img" accept="image/*">
       <div id="a-prev">${d.img?`<img class="prev" src="${d.img}" alt="">`:''}</div>
       ${d.img?'<button type="button" class="btn sm ghost" id="a-rmimg" style="color:#2a2f8f;background:#eef0ff;box-shadow:none;margin-top:6px">Remover foto</button>':''}`;
@@ -1662,7 +1665,7 @@ function openAdmin(){
   $('#a-test',m).onclick=()=>{ savePrizes(); const p=S.prizes[cur]; if(!p.title&&!p.img){ alert('Escreva o que está dentro deste baú para testar.'); return; } closeModal(); openChestScreen(cur,{preview:true}); };
   $('#a-sname',m).onclick=function(){ S.name=$('#a-name',m).value.trim()||'Astronauta'; save(); flash(this,'Salvo! ✓'); };
   $('#a-reset',m).onclick=()=>confirmBox('Zerar o progresso?','Todas as estrelas, missões e baús abertos serão apagados. Os prêmios cadastrados continuam guardados.','Zerar',()=>{ S.progress={}; S.planetsSeen={}; S.opened={}; S.sim={best:null,last:null,tries:0,n:20}; save(); closeModal(); renderMap(); show('s-map'); },true);
-  $('#a-exp',m).onclick=()=>{ const b=new Blob([JSON.stringify(S)],{type:'application/json'}), a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='missao-estrelas-backup.json'; document.body.appendChild(a); a.click(); a.remove(); };
+  $('#a-exp',m).onclick=()=>{ const b=new Blob([JSON.stringify(S)],{type:'application/json'}), a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='missao-estelar-backup.json'; document.body.appendChild(a); a.click(); a.remove(); };
   $('#a-imp',m).onchange=e=>{ const f=e.target.files[0]; if(!f) return; const fr=new FileReader(); fr.onload=()=>{ try{ const d=JSON.parse(fr.result); if(!d||typeof d!=='object'||!d.progress) throw 0; S=migrate(Object.assign(JSON.parse(JSON.stringify(DEFAULT)),d)); save(); closeModal(); renderMap(); show('s-map'); }catch(err){ alert('Esse arquivo não parece ser um backup do aplicativo.'); } }; fr.readAsText(f); };
   $('#a-voice',m).onchange=e=>{ S.voice=e.target.value; save(); };
   $('#a-vtest',m).onclick=()=>{ Snd.init(); speak('Olá, '+(S.name||'astronauta')+'! Vamos estudar juntos? Dez dezenas formam uma centena. Um lápis custa R$ 2,50.'); };
