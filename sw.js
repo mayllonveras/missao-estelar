@@ -1,6 +1,6 @@
 /* Service worker da Missão Estrelas.
    Para publicar uma versão nova, aumente o número em VERSION. */
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = 'missao-estrelas-' + VERSION;
 const SHELL = [
   './',
