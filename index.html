@@ -601,7 +601,7 @@ const LESSONS=[
    ESTADO E ARMAZENAMENTO
    ===================================================================== */
 const KEY='missao-estrelas-v1';
-const DEFAULT={name:'',sound:true,pin:'1234',claimed:false,planetsSeen:{},progress:{},prize:{emoji:'🎁',title:'',message:'',img:''}};
+const DEFAULT={name:'',sound:true,voice:'',pin:'1234',claimed:false,planetsSeen:{},progress:{},prize:{emoji:'🎁',title:'',message:'',img:''}};
 let memStore=null;
 function loadS(){
   let r=null;
@@ -689,12 +689,45 @@ const Snd={
 document.addEventListener('pointerdown',()=>Snd.init(),{once:false});
 
 /* leitura em voz alta */
+let VOICES=[];
+function loadVoices(){ try{ VOICES=(speechSynthesis.getVoices()||[]).filter(v=>/^pt/i.test(v.lang)); }catch(e){} }
+if('speechSynthesis' in window){ loadVoices(); speechSynthesis.onvoiceschanged=loadVoices; }
+function voiceScore(v){
+  const n=(v.name+' '+v.voiceURI).toLowerCase(); let s=0;
+  if(/pt[-_]br/i.test(v.lang)) s+=50;
+  if(/natural|neural|online|enhanced|premium|wavenet/.test(n)) s+=40;
+  if(/google/.test(n)) s+=20;
+  if(/francisca|thalita|antonio|luciana|fernanda|vitoria|camila|felipe/.test(n)) s+=15;
+  if(v.localService===false) s+=10;
+  return s;
+}
+function bestVoice(){
+  if(S.voice){ const v=VOICES.find(x=>x.name===S.voice); if(v) return v; }
+  return VOICES.slice().sort((a,b)=>voiceScore(b)-voiceScore(a))[0];
+}
+function cleanForSpeech(t){
+  return String(t)
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu,'')
+    .replace(/R\$\s*(\d+),(\d{2})/g,(m,a,b)=> b==='00' ? a+' reais' : a+' reais e '+(+b)+' centavos')
+    .replace(/R\$\s*(\d+)/g,'$1 reais')
+    .replace(/×/g,' vezes ').replace(/−/g,' menos ').replace(/\+/g,' mais ')
+    .replace(/→/g,' é ').replace(/←/g,' ')
+    .replace(/(^|\s)>(\s|$)/g,' maior que ').replace(/(^|\s)<(\s|$)/g,' menor que ')
+    .replace(/(^|\s)=(\s|$)/g,' igual a ')
+    .replace(/_{2,}/g,' ... ')
+    .replace(/\s+/g,' ').trim();
+}
 function stopSpeak(){ try{ window.speechSynthesis && speechSynthesis.cancel(); }catch(e){} }
 function speak(text){
   if(!('speechSynthesis' in window)) return;
   stopSpeak();
-  const u=new SpeechSynthesisUtterance(text); u.lang='pt-BR'; u.rate=.95;
-  speechSynthesis.speak(u);
+  const v=bestVoice();
+  const parts=cleanForSpeech(text).match(/[^.!?:]+[.!?:]*/g)||[];
+  parts.forEach(p=>{
+    if(!p.trim()) return;
+    const u=new SpeechSynthesisUtterance(p.trim()); u.lang='pt-BR'; if(v) u.voice=v;
+    u.rate=.92; u.pitch=1.05; speechSynthesis.speak(u);
+  });
 }
 
 /* =====================================================================
@@ -1026,6 +1059,10 @@ function openAdmin(){
     <div class="sec"><h4>👦 Criança</h4><label for="a-name">Nome</label><input type="text" id="a-name" maxlength="20" value="${esc(S.name)}"><div class="btns"><button class="btn sm" id="a-sname">Salvar nome</button></div></div>
     <div class="sec"><h4>📈 Progresso</h4><p class="hint">${doneCount()} de ${TOTAL} missões · ${totalStars()} de ${MAXSTARS} estrelas</p><table>${rows}</table>
       <div class="btns"><button class="btn sm red" id="a-reset">Zerar progresso</button></div></div>
+    <div class="sec"><h4>🔊 Voz da leitura</h4><p class="hint">É a voz do próprio aparelho. Se uma voz soar robótica, teste as outras da lista. As que têm Google, Natural ou Neural costumam ser melhores.</p>
+      <label for="a-voice">Voz</label><select id="a-voice" style="width:100%;font:inherit;font-size:18px;padding:10px;border-radius:14px;border:3px solid #d9ddff;color:#1c2150;background:#fff"><option value="">Automática (a melhor encontrada)</option>${VOICES.map(v=>`<option value="${esc(v.name)}" ${v.name===S.voice?'selected':''}>${esc(v.name)} (${esc(v.lang)})</option>`).join('')}</select>
+      ${VOICES.length?'':'<p class="hint">Este aparelho não informou vozes em português. Instale uma voz em Configurações → Idioma → Saída de texto para voz.</p>'}
+      <div class="btns"><button class="btn sm" id="a-vtest">Testar voz</button></div></div>
     <div class="sec"><h4>💾 Backup</h4><p class="hint">Os dados ficam salvos neste aparelho e navegador. Para levar o prêmio e o progresso para outro aparelho, baixe o backup e restaure lá.</p>
       <div class="btns"><button class="btn sm" id="a-exp">Baixar backup</button><label class="btn sm ghost" style="color:#2a2f8f;background:#eef0ff;box-shadow:none;margin:0;display:inline-block;cursor:pointer">Restaurar backup<input type="file" id="a-imp" accept="application/json" style="display:none"></label></div></div>
     <div class="sec"><h4>🔒 Segurança</h4><label for="a-pin">Novo PIN (4 números)</label><input type="password" id="a-pin" inputmode="numeric" maxlength="4" placeholder="••••"><div class="btns"><button class="btn sm" id="a-spin">Trocar PIN</button></div></div>
@@ -1041,6 +1078,8 @@ function openAdmin(){
   $('#a-reset',m).onclick=()=>confirmBox('Zerar o progresso?','Todas as estrelas e missões concluídas serão apagadas. O prêmio cadastrado continua guardado.','Zerar',()=>{ S.progress={}; S.planetsSeen={}; S.claimed=false; save(); closeModal(); renderMap(); show('s-map'); },true);
   $('#a-exp',m).onclick=()=>{ const b=new Blob([JSON.stringify(S)],{type:'application/json'}), a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='missao-estrelas-backup.json'; document.body.appendChild(a); a.click(); a.remove(); };
   $('#a-imp',m).onchange=e=>{ const f=e.target.files[0]; if(!f) return; const fr=new FileReader(); fr.onload=()=>{ try{ const d=JSON.parse(fr.result); if(!d||typeof d!=='object'||!d.progress) throw 0; S=Object.assign(JSON.parse(JSON.stringify(DEFAULT)),d); S.prize=Object.assign({},DEFAULT.prize,d.prize||{}); save(); closeModal(); renderMap(); show('s-map'); }catch(err){ alert('Esse arquivo não parece ser um backup do aplicativo.'); } }; fr.readAsText(f); };
+  $('#a-voice',m).onchange=e=>{ S.voice=e.target.value; save(); };
+  $('#a-vtest',m).onclick=()=>{ Snd.init(); speak('Olá, '+(S.name||'astronauta')+'! Vamos estudar juntos? Dez dezenas formam uma centena. Um lápis custa R$ 2,50.'); };
   $('#a-spin',m).onclick=function(){ const v=$('#a-pin',m).value; if(!/^\d{4}$/.test(v)){ alert('O PIN precisa ter exatamente 4 números.'); return; } S.pin=v; save(); flash(this,'PIN trocado ✓'); $('#a-pin',m).value=''; };
   $('#a-close',m).onclick=()=>{ closeModal(); if($('#s-map').classList.contains('active')) renderMap(false); };
 }
